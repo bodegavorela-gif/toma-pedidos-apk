@@ -1,5 +1,6 @@
 name: Compilar APK de Toma de Pedidos
-
+permissions:
+  contents: write
 on:
   push:
     branches: [main]
