@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Toma de Pedidos</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="native/capacitor.js"></script>
+<script src="native/capacitor-share.js"></script>
+<script src="native/capacitor-filesystem.js"></script>
+<style>
+  :root{
+    --ink:#161B22;
+    --paper:#F1F3F5;
+    --paper-2:#FFFFFF;
+    --line:#D7DCE1;
+    --accent:#E63946;
+    --accent-ink:#FFFFFF;
+    --ok:#2A9D8F;
+    --warn:#C97A1B;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--paper);color:var(--ink);font-family:var(--sans);-webkit-font-smoothing:antialiased;}
+  body{padding-bottom:84px;min-height:100vh;}
+  h1,h2,h3{font-family:var(--sans);margin:0;}
+  .app{max-width:520px;margin:0 auto;}
+  header.top{
+    background:var(--ink);color:#fff;padding:18px 20px 16px;
+    position:sticky;top:0;z-index:20;
+  }
+  header.top .brand{display:flex;align-items:baseline;gap:8px;}
+  header.top .brand .tag{font-family:var(--mono);font-size:11px;letter-spacing:.14em;color:#F1A6AC;text-transform:uppercase;}
+  header.top h1{font-size:19px;font-weight:700;letter-spacing:-0.01em;}
+  header.top .sub{font-family:var(--mono);font-size:11.5px;color:#9AA4AF;margin-top:3px;}
+
+  nav.tabs{display:flex;background:var(--paper-2);border-bottom:1px solid var(--line);position:sticky;top:64px;z-index:19;}
+  nav.tabs button{
+    flex:1;padding:12px 4px;border:none;background:none;font-family:var(--sans);
+    font-size:13px;font-weight:600;color:#8A94A0;cursor:pointer;position:relative;
+  }
+  nav.tabs button.active{color:var(--ink);}
+  nav.tabs button.active::after{content:"";position:absolute;left:14px;right:14px;bottom:0;height:2.5px;background:var(--accent);}
+  nav.tabs .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--accent);margin-left:5px;position:relative;top:-1px;}
+
+  main{padding:16px 16px 8px;}
+  section.view{display:none;}
+  section.view.active{display:block;animation:fadeIn .18s ease;}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);}}
+
+  .card{background:var(--paper-2);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px;}
+  .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#6B7480;margin-bottom:12px;font-weight:700;}
+
+  label{display:block;font-size:12.5px;font-weight:600;color:#4A525C;margin-bottom:5px;}
+  input[type=text],input[type=number],select{
+    width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:8px;
+    font-size:15.5px;font-family:var(--sans);background:#fff;color:var(--ink);margin-bottom:12px;
+  }
+  input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:var(--ink);}
+  .field-row{display:flex;gap:10px;}
+  .field-row > div{flex:1;}
+
+  button{cursor:pointer;font-family:var(--sans);}
+  .btn{
+    display:block;width:100%;padding:13px 16px;border-radius:9px;border:none;
+    font-size:15px;font-weight:700;text-align:center;
+  }
+  .btn-primary{background:var(--ink);color:#fff;}
+  .btn-scan{background:var(--accent);color:#fff;font-size:16px;padding:16px;letter-spacing:.01em;}
+  .btn-outline{background:none;border:1.5px solid var(--ink);color:var(--ink);}
+  .btn-ghost{background:none;border:1.5px solid var(--line);color:#5A6270;font-weight:600;font-size:13.5px;padding:9px 12px;}
+  .btn-sm{padding:8px 10px;font-size:13px;border-radius:7px;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+  .btn-row{display:flex;gap:10px;}
+  .btn-row .btn{flex:1;}
+
+  .muted{color:#8A94A0;font-size:13px;line-height:1.5;}
+  .pill{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:20px;background:#EEF1F3;color:#5A6270;font-weight:600;}
+  .pill.ok{background:#E4F3F1;color:var(--ok);}
+  .pill.warn{background:#FBEEDF;color:var(--warn);}
+
+  /* Catalog */
+  .drop{
+    border:1.5px dashed var(--line);border-radius:9px;padding:22px 14px;text-align:center;
+    background:#FAFBFC;
+  }
+  .drop input{display:none;}
+  .drop .icon{font-size:26px;margin-bottom:6px;}
+  .cat-stats{display:flex;gap:10px;margin-top:12px;}
+  .cat-stats .stat{flex:1;background:#FAFBFC;border:1px solid var(--line);border-radius:8px;padding:10px 8px;text-align:center;}
+  .cat-stats .stat b{display:block;font-family:var(--mono);font-size:19px;}
+  .cat-stats .stat span{font-size:10.5px;color:#8A94A0;text-transform:uppercase;letter-spacing:.05em;}
+
+  /* Cart - ticket style */
+  .ticket{background:var(--paper-2);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px;}
+  .ticket-head{padding:12px 14px;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;background:#FAFBFC;}
+  .ticket-head span{font-family:var(--mono);font-size:11px;color:#8A94A0;text-transform:uppercase;letter-spacing:.06em;}
+  .item{padding:12px 14px;border-bottom:1px solid #EEF0F2;}
+  .item .item-row{display:flex;align-items:center;gap:10px;}
+  .item .item-note{margin-top:8px;}
+  .item .item-note input{
+    width:100%;padding:7px 10px;margin:0;border:1.5px dashed var(--line);border-radius:7px;
+    font-size:13px;color:#4A525C;background:#FAFBFC;
+  }
+  .item .item-note input:focus{outline:none;border-color:var(--accent);border-style:solid;}
+  .item:last-child{border-bottom:none;}
+  .item .info{flex:1;min-width:0;}
+  .item .ref{font-family:var(--mono);font-weight:700;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .item .price{font-size:12px;color:#8A94A0;margin-top:2px;}
+  .qty{display:flex;align-items:center;gap:6px;}
+  .qty button{width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:#fff;font-size:15px;line-height:1;font-weight:700;}
+  .qty input{width:38px;text-align:center;padding:4px 2px;margin:0;border:1px solid var(--line);border-radius:6px;font-size:14px;}
+  .item .sub{font-family:var(--mono);font-weight:700;font-size:13.5px;width:74px;text-align:right;}
+  .item .rm{background:none;border:none;color:#C4CAD1;font-size:17px;padding:0 0 0 4px;}
+  .empty-cart{padding:30px 16px;text-align:center;color:#8A94A0;font-size:13.5px;}
+  .total-row{display:flex;justify-content:space-between;align-items:center;padding:14px;background:var(--ink);color:#fff;}
+  .total-row span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:#9AA4AF;}
+  .total-row b{font-family:var(--mono);font-size:20px;}
+
+  /* Manual add */
+  details.manual{margin-bottom:14px;}
+  details.manual summary{cursor:pointer;font-size:13px;font-weight:600;color:#5A6270;padding:4px 0;list-style:none;}
+  details.manual summary::-webkit-details-marker{display:none;}
+  details.manual summary::before{content:"+ ";color:var(--accent);font-weight:800;}
+  details.manual[open] summary::before{content:"− ";}
+
+  /* Escaneo: video en vivo (funciona fuera del iframe de Claude) + respaldo por foto */
+  #scan-overlay{
+    position:fixed;inset:0;background:#000;z-index:100;display:none;flex-direction:column;
+  }
+  #scan-overlay.active{display:flex;}
+  #reader{flex:1;}
+  #reader video{object-fit:cover;}
+  .scan-bar{position:absolute;top:0;left:0;right:0;padding:16px;display:flex;justify-content:space-between;align-items:center;z-index:2;}
+  .scan-bar span{background:rgba(0,0,0,.55);color:#fff;font-family:var(--mono);font-size:11px;padding:9px 14px;border-radius:20px;backdrop-filter:blur(4px);}
+  .scan-bar button{background:rgba(255,255,255,.15);color:#fff;border:none;border-radius:20px;padding:9px 16px;font-size:13px;font-weight:700;backdrop-filter:blur(4px);}
+  .scan-count{
+    position:absolute;bottom:24px;left:50%;transform:translateX(-50%);z-index:3;
+    background:var(--accent);color:#fff;font-family:var(--mono);font-weight:700;font-size:13px;
+    padding:8px 18px;border-radius:20px;
+  }
+  #scan-processing{
+    position:fixed;inset:0;background:rgba(22,27,34,.92);z-index:100;display:none;
+    flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff;
+  }
+  #scan-processing.show{display:flex;}
+
+  #surtido-overlay{
+    position:fixed;inset:0;background:rgba(22,27,34,.55);z-index:130;display:none;
+    align-items:flex-end;justify-content:center;
+  }
+  #surtido-overlay.show{display:flex;}
+  #surtido-panel{
+    background:#fff;border-radius:16px 16px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));
+    width:100%;max-width:520px;max-height:80vh;overflow-y:auto;
+  }
+  #surtido-rows .field-row{margin-bottom:8px;}
+  #surtido-rows input{margin:0;padding:9px 10px;font-size:15px;text-align:center;}
+  #scan-processing div:last-child{font-family:var(--mono);font-size:13px;letter-spacing:.04em;}
+  .spinner{
+    width:38px;height:38px;border-radius:50%;border:3px solid rgba(255,255,255,.25);
+    border-top-color:var(--accent);animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+  .toast{
+    position:absolute;left:16px;right:16px;bottom:76px;z-index:4;
+    background:#fff;border-radius:10px;padding:13px 15px;box-shadow:0 6px 20px rgba(0,0,0,.3);
+    display:none;align-items:center;gap:10px;
+  }
+  .toast.show{display:flex;animation:pop .25s ease;}
+  @keyframes pop{from{transform:scale(.9);opacity:0;}to{transform:scale(1);opacity:1;}}
+  .toast .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+  .toast.ok .dot{background:var(--ok);}
+  .toast.warn .dot{background:var(--warn);}
+  .toast .tt{font-size:13.5px;font-weight:600;flex:1;}
+  .toast .tt small{display:block;font-weight:400;color:#8A94A0;font-family:var(--mono);font-size:11px;margin-top:2px;}
+
+  /* history */
+  /* fotos */
+  .foto-card{background:var(--paper-2);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px;display:flex;}
+  .foto-card .foto-img{width:110px;height:110px;flex-shrink:0;background:#EEF1F3;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .foto-card .foto-img img{width:100%;height:100%;object-fit:cover;}
+  .foto-card .foto-img .sin-foto{font-size:10.5px;color:#9AA4AF;text-align:center;padding:6px;font-family:var(--mono);}
+  .foto-card .foto-img.no-foto::after{content:'Sin foto';font-family:var(--mono);font-size:10.5px;color:#9AA4AF;}
+  .foto-card .foto-info{flex:1;padding:12px 14px;min-width:0;}
+  .foto-card .foto-codigo{font-family:var(--mono);font-weight:700;font-size:14px;}
+  .foto-card .foto-desc{font-size:13px;color:#4A525C;margin-top:2px;}
+  .foto-card .foto-precios{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;}
+  .foto-card .foto-precios span{font-family:var(--mono);font-size:11px;background:#EEF1F3;border-radius:6px;padding:3px 7px;}
+  .foto-card .foto-precios span b{color:var(--ink);}
+
+  .hist-item{background:var(--paper-2);border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-bottom:9px;}
+  .hist-item .row1{display:flex;justify-content:space-between;font-weight:700;font-size:14px;}
+  .hist-item .row2{display:flex;justify-content:space-between;margin-top:4px;font-size:12px;color:#8A94A0;font-family:var(--mono);}
+
+  .banner{
+    background:#FBEEDF;border:1px solid #F0D9B8;color:#8A5A16;padding:11px 13px;border-radius:8px;
+    font-size:12.5px;line-height:1.5;margin-bottom:14px;
+  }
+  .footer-note{text-align:center;font-size:11px;color:#B0B7BF;padding:14px 0 4px;}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="top">
+    <div class="brand">
+      <h1>Toma de Pedidos</h1>
+    </div>
+    <div class="sub" id="header-sub">sin catálogo cargado</div>
+  </header>
+
+  <div id="app-msg" style="display:none;position:sticky;top:0;z-index:50;background:#C0152F;color:#fff;padding:12px 16px;font-size:13px;line-height:1.5;">
+    <div id="app-msg-text" style="white-space:pre-line;"></div>
+    <button id="app-msg-close" style="margin-top:8px;background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:16px;padding:6px 14px;font-size:12px;font-weight:700;">Entendido</button>
+  </div>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="pedido">Pedido</button>
+    <button class="tab-btn" data-tab="fotos">Fotos</button>
+    <button class="tab-btn" data-tab="historial">Historial</button>
+  </nav>
+
+  <main>
+
+    <!-- PEDIDO -->
+    <section class="view active" id="view-pedido">
+      <div class="card">
+        <h2>Datos del pedido</h2>
+        <label for="in-nit">NIT del cliente</label>
+        <input type="text" id="in-nit" placeholder="Ej: 900123456-1" autocomplete="off">
+        <label for="in-lista">Lista de precios</label>
+        <select id="in-lista"><option value="">Carga un catálogo primero</option></select>
+      </div>
+
+      <button class="btn btn-scan" id="btn-open-scan">📷&nbsp;&nbsp;Escanear producto</button>
+
+      <details class="manual">
+        <summary>Agregar referencia manualmente</summary>
+        <div class="card" style="margin-top:8px;">
+          <label for="man-ref">Referencia</label>
+          <input type="text" id="man-ref" placeholder="Ej: VOR-0234" list="dl-refs">
+          <datalist id="dl-refs"></datalist>
+          <div class="field-row">
+            <div>
+              <label for="man-cant">Cantidad</label>
+              <input type="number" id="man-cant" value="1" min="1">
+            </div>
+            <div>
+              <label for="man-valor">Valor unitario</label>
+              <input type="number" id="man-valor" placeholder="0">
+            </div>
+          </div>
+          <button class="btn btn-outline" id="btn-man-add">Agregar al pedido</button>
+        </div>
+      </details>
+
+      <details class="manual">
+        <summary>Producto sin código todavía (color nuevo)</summary>
+        <div class="card" style="margin-top:8px;">
+          <div class="muted" style="margin-bottom:10px;">Para colores/artículos que aún no existen en Saya. Esto <b>no</b> va en el Excel — queda en una lista aparte para que avises a la oficina y te asignen el código.</div>
+          <label for="pend-desc">Artículo / descripción</label>
+          <input type="text" id="pend-desc" placeholder="Ej: Blusa 1003 manga larga">
+          <div class="field-row">
+            <div>
+              <label for="pend-color">Color deseado</label>
+              <input type="text" id="pend-color" placeholder="Ej: Azul rey">
+            </div>
+            <div>
+              <label for="pend-cant">Cantidad</label>
+              <input type="number" id="pend-cant" value="1" min="1">
+            </div>
+          </div>
+          <button class="btn btn-outline" id="btn-pend-add">Agregar a pendientes</button>
+        </div>
+      </details>
+
+      <div class="ticket" id="pend-ticket" style="display:none;">
+        <div class="ticket-head">
+          <span>Pendientes sin código</span>
+          <span id="pend-count">0 ítems</span>
+        </div>
+        <div id="pend-list"></div>
+        <div style="padding:10px 14px;">
+          <button class="btn btn-outline btn-sm" id="btn-pend-copy" style="width:100%;">Copiar lista para enviar</button>
+        </div>
+      </div>
+
+      <div class="ticket">
+        <div class="ticket-head">
+          <span>Referencias del pedido</span>
+          <span id="item-count">0 ítems</span>
+        </div>
+        <div id="cart-search-wrap" style="display:none;padding:10px 14px 0;">
+          <input type="text" id="cart-search" placeholder="Buscar referencia en este pedido…">
+        </div>
+        <div id="cart-list">
+          <div class="empty-cart">Aún no has escaneado ni agregado productos.</div>
+        </div>
+        <div class="total-row">
+          <span>Total pedido</span>
+          <b id="cart-total">$0</b>
+        </div>
+      </div>
+
+      <button class="btn btn-ghost" id="btn-clear">Vaciar pedido</button>
+      <br><br>
+      <button class="btn btn-primary" id="btn-export" disabled>Generar y compartir pedido</button>
+    </section>
+
+    <!-- FOTOS: catálogo visual, separado de la toma de pedidos -->
+    <section class="view" id="view-fotos">
+      <div class="card">
+        <h2>Buscar producto</h2>
+        <label for="fotos-buscar">Código, referencia o nombre</label>
+        <input type="text" id="fotos-buscar" placeholder="Ej: 1003, blusa siza…">
+      </div>
+      <div id="fotos-resultados"></div>
+    </section>
+
+    <!-- HISTORIAL -->
+    <section class="view" id="view-historial">
+      <div id="hist-list">
+        <div class="muted" style="padding:8px 2px;">Aquí quedan guardados los pedidos que generes en este celular.</div>
+      </div>
+    </section>
+
+  </main>
+
+  <div class="footer-note">Cada pedido se puede compartir directo (WhatsApp, correo…) o queda descargado en tu celular.</div>
+</div>
+
+<!-- SCANNER: video en vivo (funciona en hosting real, fuera del iframe de Claude) -->
+<div id="scan-overlay">
+  <div class="scan-bar">
+    <span id="scan-lista-label">Lista: —</span>
+    <button id="btn-close-scan">Cerrar ✕</button>
+  </div>
+  <div id="reader"></div>
+</div>
+
+<div class="toast" id="scan-toast" style="position:fixed;left:16px;right:16px;bottom:24px;z-index:120;"><div class="dot"></div><div class="tt" id="scan-toast-text"></div></div>
+
+<!-- Respaldo: si el video en vivo falla (p.ej. dentro del iframe de Claude), se usa foto -->
+<input type="file" id="scan-file-input" accept="image/*" capture="environment" style="display:none;">
+<div id="scan-processing">
+  <div class="spinner"></div>
+  <div>Leyendo código…</div>
+</div>
+
+<!-- Panel de surtido: al escanear un código de referencia base, pedir cantidad por talla -->
+<div id="surtido-overlay">
+  <div id="surtido-panel">
+    <h2 id="surtido-title">Referencia</h2>
+    <div class="muted" id="surtido-sub" style="margin-bottom:12px;"></div>
+    <div class="field-row" style="align-items:flex-end;margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--line);">
+      <div style="flex:1;">
+        <label for="surtido-total" style="margin-bottom:5px;">Cantidad total (repartir pareja)</label>
+        <input type="number" min="0" id="surtido-total" placeholder="Ej: 12">
+      </div>
+      <button class="btn btn-outline btn-sm" id="btn-surtido-distribuir" style="flex:0 0 auto;height:44px;">Distribuir</button>
+    </div>
+    <div id="surtido-rows"></div>
+    <div class="btn-row" style="margin-top:14px;">
+      <button class="btn btn-ghost" id="btn-surtido-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="btn-surtido-add">Agregar surtido</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  function notify(msg){
+    const box = document.getElementById('app-msg');
+    const txt = document.getElementById('app-msg-text');
+    txt.textContent = msg;
+    box.style.display = 'block';
+    box.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+  document.getElementById('app-msg-close').addEventListener('click', ()=>{
+    document.getElementById('app-msg').style.display = 'none';
+  });
+
+  window.addEventListener('error', function(ev){
+    console.error('Error global:', ev.error || ev.message);
+    notify('Ocurrió un error inesperado: ' + (ev.error && (ev.error.name||ev.error.message) ? (ev.error.name||'')+' '+(ev.error.message||'') : ev.message));
+  });
+  window.addEventListener('unhandledrejection', function(ev){
+    console.error('Promesa sin manejar:', ev.reason);
+    notify('Ocurrió un error inesperado: ' + (ev.reason && (ev.reason.message||ev.reason.name) ? (ev.reason.name||'')+' '+(ev.reason.message||'') : ev.reason));
+  });
+
+  // Catálogo cargado como archivo aparte (catalogo.json) en vez de incrustado en el
+  // HTML — así actualizar el catálogo es solo reemplazar ese archivo, sin tocar la app.
+  let catalogFetchPromise = null;
+  async function fetchEmbeddedCatalog(){
+    try{
+      const res = await fetch('catalogo.json', {cache:'no-cache'});
+      if(!res.ok) throw new Error('HTTP '+res.status);
+      const arr = await res.json();
+      return arr.map(a=>({codigo:a[0], referencia:a[1], lista:a[2], valor:a[3], articulo:a[4], talla:a[5], descripcion:a[6]}));
+    }catch(e){
+      console.error('No se pudo cargar catalogo.json', e);
+      notify('No pude cargar el catálogo (catalogo.json). Revisa tu conexión y que el archivo esté junto al index.html, luego recarga la página.');
+      return [];
+    }
+  }
+  // Solo pide el archivo una vez, aunque varias partes de la app lo necesiten.
+  function loadEmbeddedCatalog(){
+    if(!catalogFetchPromise) catalogFetchPromise = fetchEmbeddedCatalog();
+    return catalogFetchPromise;
+  }
+
+
+
+  // ---------- State ----------
+  let catalog = [];          // [{codigo, referencia, lista, valor}]
+  let cart = [];              // [{referencia, cantidad, valor}]
+  let pendientes = [];        // [{descripcion, color, cantidad}] — no va al Excel
+  let selectedLista = "";
+  let html5Qrcode = null;
+  let sessionScanCount = 0;
+  let saveTimer = null;
+
+  const money = n => "$" + Math.round(Number(n)||0).toLocaleString("es-CO");
+
+  // ---------- Almacenamiento local (ahora sí persiste: la app corre fuera de Claude) ----------
+  function lsGet(key, fallback){
+    try{ const v = localStorage.getItem(key); return v!==null ? JSON.parse(v) : fallback; }
+    catch(e){ return fallback; }
+  }
+  function lsSet(key, value){
+    try{ localStorage.setItem(key, JSON.stringify(value)); }catch(e){ /* almacenamiento lleno o no disponible */ }
+  }
+
+  let historial = lsGet('tp_historial', []);
+
+  let draftSaveTimer = null;
+  function debounceSaveDraft(){
+    clearTimeout(draftSaveTimer);
+    draftSaveTimer = setTimeout(()=>{
+      lsSet('tp_draft', {
+        nit: document.getElementById('in-nit').value,
+        lista: selectedLista,
+        cart,
+        pendientes
+      });
+    }, 400);
+  }
+
+  // ---------- Tabs ----------
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('view-'+btn.dataset.tab).classList.add('active');
+      if(btn.dataset.tab === 'historial') renderHistory();
+    });
+  });
+
+  // ---------- Catalog parsing ----------
+  function normHeader(h){
+    return String(h||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9]/g,'');
+  }
+  function findCol(norm, aliases){
+    for(const a of aliases){ const i = norm.indexOf(a); if(i!==-1) return i; }
+    return -1;
+  }
+  function parseMoney(v){
+    if(v===undefined||v===null||v==='') return 0;
+    if(typeof v === 'number') return v;
+    const cleaned = String(v).replace(/[^0-9.\-]/g,'').replace(/,/g,'');
+    const n = Number(cleaned);
+    return isNaN(n) ? 0 : n;
+  }
+
+  // Parser CSV propio (más confiable que dejar que la librería adivine el delimitador,
+  // porque los precios usan coma como separador de miles: "10,000").
+  function stripBOM(s){ return s.charCodeAt(0)===0xFEFF ? s.slice(1) : s; }
+  function detectDelimiter(line){
+    const semis = (line.match(/;/g)||[]).length;
+    const commas = (line.match(/,/g)||[]).length;
+    return semis >= commas ? ';' : ',';
+  }
+  function splitCsvLine(line, delim){
+    const out=[]; let cur=''; let inQuotes=false;
+    for(let i=0;i<line.length;i++){
+      const ch=line[i];
+      if(ch==='"'){
+        if(inQuotes && line[i+1]==='"'){ cur+='"'; i++; }
+        else inQuotes = !inQuotes;
+      } else if(ch===delim && !inQuotes){
+        out.push(cur); cur='';
+      } else {
+        cur+=ch;
+      }
+    }
+    out.push(cur);
+    return out.map(s=>s.trim());
+  }
+  function parseCsvText(text){
+    text = stripBOM(text).replace(/\r\n/g,'\n').replace(/\r/g,'\n');
+    const lines = text.split('\n').filter(l=>l.length>0);
+    if(!lines.length) return [];
+    const delim = detectDelimiter(lines[0]);
+    return lines.map(line=>splitCsvLine(line, delim));
+  }
+
+  // Alias del código que se escanea: prioriza columnas de "barras"/EAN reales
+  // sobre una columna genérica "codigo" (que en Saya suele ser el artículo base,
+  // repetido entre tallas/colores — no sirve para escanear).
+  const CODE_ALIASES_PRIMARY = ['barras','codigobarras','codigodebarras','ean13','ean','barcode','qr'];
+  const CODE_ALIASES_FALLBACK = ['codigo','código'];
+  const REF_ALIASES = ['referencia','referenciaproducto','ref','sku'];
+  const LISTA_ALIASES = ['lista','listaprecio','listadeprecio','codigoalterno','codigoalternolistaprecio','listaprecioproducto'];
+  const VALOR_ALIASES = ['valor','preciounidad','preciounitario','valorproducto'];
+  const ARTICULO_ALIASES = ['codigo','código','articulo','codigoarticulo','codigobase'];
+  const TALLA_ALIASES = ['talla','talle','size'];
+  const DESCRIPCION_ALIASES = ['descripcion','descripción','nombre','nombreproducto'];
+  // Columnas que NUNCA son una lista de precios, aunque queden numéricas.
+  const KNOWN_META = ['codigo','referencia','descripcion','barras','color','talla','tipodeproducto',
+    'linea','basicos','disenadora','coleccion','categoria','prenda','tipotejido','estado',
+    'costoestandar','costo','unidad','unidadmedida','marca'];
+
+  function parseCatalogRows(rows){
+    if(!rows.length) return [];
+    const header = rows[0];
+    const norm = header.map(normHeader);
+
+    let codeIdx = findCol(norm, CODE_ALIASES_PRIMARY);
+    if(codeIdx===-1) codeIdx = findCol(norm, CODE_ALIASES_FALLBACK);
+    const refIdx = findCol(norm, REF_ALIASES);
+
+    if(codeIdx===-1 || refIdx===-1){
+      notify('No pude reconocer las columnas de código de barras y referencia. Revisa los encabezados del archivo.');
+      return [];
+    }
+
+    const listaIdx = findCol(norm, LISTA_ALIASES);
+    const valorIdx = findCol(norm, VALOR_ALIASES);
+    const articuloIdx = findCol(norm, ARTICULO_ALIASES);
+    const tallaIdx = findCol(norm, TALLA_ALIASES);
+    const descIdx = findCol(norm, DESCRIPCION_ALIASES);
+    const out = [];
+
+    // Formato "largo": una columna de lista + una de valor (una fila por código+lista)
+    if(listaIdx!==-1 && valorIdx!==-1){
+      for(let i=1;i<rows.length;i++){
+        const r = rows[i]; if(!r || r.every(c=>c===undefined||c==='')) continue;
+        const codigo = String(r[codeIdx]??'').trim();
+        const referencia = String(r[refIdx]??'').trim();
+        if(!codigo || !referencia) continue;
+        out.push({
+          codigo, referencia, lista: (String(r[listaIdx]??'').trim())||'GENERAL', valor: parseMoney(r[valorIdx]),
+          articulo: articuloIdx!==-1 ? String(r[articuloIdx]??'').trim() : '',
+          talla: tallaIdx!==-1 ? String(r[tallaIdx]??'').trim() : '',
+          descripcion: descIdx!==-1 ? String(r[descIdx]??'').trim() : ''
+        });
+      }
+      return out;
+    }
+
+    // Formato "ancho": una columna por cada lista de precios (como el export de Saya)
+    const metaIdxSet = new Set([codeIdx, refIdx]);
+    const listColumns = [];
+    header.forEach((h,i)=>{
+      if(metaIdxSet.has(i)) return;
+      if(KNOWN_META.includes(normHeader(h))) return;
+      let numericCount=0, sampled=0;
+      for(let r=1; r<rows.length && sampled<40; r++){
+        const v = rows[r][i];
+        if(v===undefined || v==='') continue;
+        sampled++;
+        const cleaned = String(v).replace(/[^0-9.\-]/g,'').replace(/,/g,'');
+        if(cleaned!=='' && !isNaN(Number(cleaned))) numericCount++;
+      }
+      if(sampled>0 && numericCount/sampled > 0.7){
+        listColumns.push({idx:i, name: String(h).trim()});
+      }
+    });
+
+    for(let i=1;i<rows.length;i++){
+      const r = rows[i]; if(!r || r.every(c=>c===undefined||c==='')) continue;
+      const codigo = String(r[codeIdx]??'').trim();
+      const referencia = String(r[refIdx]??'').trim();
+      if(!codigo || !referencia) continue;
+      const articulo = articuloIdx!==-1 ? String(r[articuloIdx]??'').trim() : '';
+      const talla = tallaIdx!==-1 ? String(r[tallaIdx]??'').trim() : '';
+      const descripcion = descIdx!==-1 ? String(r[descIdx]??'').trim() : '';
+      if(!listColumns.length){
+        out.push({codigo, referencia, lista:'GENERAL', valor:0, articulo, talla, descripcion});
+        continue;
+      }
+      for(const col of listColumns){
+        const valor = parseMoney(r[col.idx]);
+        if(valor>0) out.push({codigo, referencia, lista: col.name, valor, articulo, talla, descripcion});
+      }
+    }
+    return out;
+  }
+
+  function renderCatalogStats(){
+    if(!catalog.length){
+      document.getElementById('header-sub').textContent = 'sin catálogo cargado';
+      return;
+    }
+    const refs = new Set(catalog.map(c=>c.referencia));
+    const listas = [...new Set(catalog.map(c=>c.lista))];
+    document.getElementById('header-sub').textContent = `${refs.size} referencias · ${listas.length} listas`;
+  }
+
+  function populateListaSelect(){
+    const sel = document.getElementById('in-lista');
+    const listas = [...new Set(catalog.map(c=>c.lista))];
+    if(!listas.length){
+      sel.innerHTML = '<option value="">Carga un catálogo primero</option>';
+      return;
+    }
+    sel.innerHTML = '<option value="">Selecciona lista de precios</option>' +
+      listas.map(l=>`<option value="${escapeAttr(l)}">${escapeHtml(l)}</option>`).join('');
+    if(selectedLista && listas.includes(selectedLista)) sel.value = selectedLista;
+  }
+
+  function populateRefDatalist(){
+    const dl = document.getElementById('dl-refs');
+    const refs = [...new Set(catalog.map(c=>c.referencia))].slice(0,500);
+    dl.innerHTML = refs.map(r=>`<option value="${escapeAttr(r)}">`).join('');
+  }
+
+  document.getElementById('in-lista').addEventListener('change', (e)=>{
+    selectedLista = e.target.value;
+    debounceSaveDraft();
+    updateExportState();
+  });
+
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function escapeAttr(s){ return escapeHtml(s); }
+
+  // ---------- Cart ----------
+  function addToCart(referencia, valor, {silent}={}){
+    let row = cart.find(it=>it.referencia===referencia && it.valor===valor && !it.nota);
+    if(row){ row.cantidad += 1; }
+    else{ cart.push({referencia, cantidad:1, valor: Number(valor)||0, nota:''}); }
+    renderCart();
+    debounceSaveDraft();
+  }
+
+  let cartSearchTerm = '';
+
+  function renderCart(){
+    const list = document.getElementById('cart-list');
+    const searchWrap = document.getElementById('cart-search-wrap');
+    const count = cart.reduce((a,b)=>a+b.cantidad,0);
+    document.getElementById('item-count').textContent = count + (count===1?' ítem':' ítems');
+
+    // El buscador solo aparece cuando el pedido ya tiene varias líneas (evita estorbar en pedidos cortos).
+    searchWrap.style.display = cart.length > 8 ? 'block' : 'none';
+    if(cart.length <= 8 && cartSearchTerm){ cartSearchTerm = ''; document.getElementById('cart-search').value = ''; }
+
+    if(!cart.length){
+      list.innerHTML = '<div class="empty-cart">Aún no has escaneado ni agregado productos.</div>';
+    } else {
+      const term = cartSearchTerm.trim().toLowerCase();
+      const indices = cart.map((it,i)=>i).filter(i=>!term || cart[i].referencia.toLowerCase().includes(term));
+      if(!indices.length){
+        list.innerHTML = '<div class="empty-cart">Ningún producto del pedido coincide con "'+escapeHtml(cartSearchTerm)+'".</div>';
+      } else {
+        list.innerHTML = indices.map(i=>{
+          const it = cart[i];
+          return `
+        <div class="item">
+          <div class="item-row">
+            <div class="info">
+              <div class="ref">${escapeHtml(it.referencia)}</div>
+              <div class="price">${money(it.valor)} c/u</div>
+            </div>
+            <div class="qty">
+              <button data-act="dec" data-i="${i}">−</button>
+              <input type="number" min="1" value="${it.cantidad}" data-act="set" data-i="${i}">
+              <button data-act="inc" data-i="${i}">+</button>
+            </div>
+            <div class="sub">${money(it.cantidad*it.valor)}</div>
+            <button class="rm" data-act="rm" data-i="${i}">×</button>
+          </div>
+          <div class="item-note">
+            <input type="text" placeholder="Color / observación (opcional)" value="${escapeAttr(it.nota||'')}" data-act="nota" data-i="${i}">
+          </div>
+        </div>
+      `;
+        }).join('');
+      }
+    }
+    const total = cart.reduce((a,b)=>a+b.cantidad*b.valor,0);
+    document.getElementById('cart-total').textContent = money(total);
+    updateExportState();
+  }
+
+  document.getElementById('cart-search').addEventListener('input', (e)=>{
+    cartSearchTerm = e.target.value;
+    renderCart();
+  });
+
+  document.getElementById('cart-list').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-act]');
+    if(!btn) return;
+    const i = Number(btn.dataset.i);
+    if(btn.dataset.act==='inc') cart[i].cantidad += 1;
+    if(btn.dataset.act==='dec') cart[i].cantidad = Math.max(1, cart[i].cantidad-1);
+    if(btn.dataset.act==='rm') cart.splice(i,1);
+    renderCart();
+    debounceSaveDraft();
+  });
+  document.getElementById('cart-list').addEventListener('change', (e)=>{
+    if(e.target.dataset.act==='set'){
+      const i = Number(e.target.dataset.i);
+      cart[i].cantidad = Math.max(1, Number(e.target.value)||1);
+      renderCart();
+      debounceSaveDraft();
+    } else if(e.target.dataset.act==='nota'){
+      const i = Number(e.target.dataset.i);
+      cart[i].nota = e.target.value.trim();
+      debounceSaveDraft();
+    }
+  });
+
+  document.getElementById('btn-man-add').addEventListener('click', ()=>{
+    const ref = document.getElementById('man-ref').value.trim();
+    const cant = Math.max(1, Number(document.getElementById('man-cant').value)||1);
+    const valor = Number(document.getElementById('man-valor').value)||0;
+    if(!ref){ notify('Escribe una referencia.'); return; }
+    let row = cart.find(it=>it.referencia===ref && it.valor===valor && !it.nota);
+    if(row) row.cantidad += cant;
+    else cart.push({referencia:ref, cantidad:cant, valor, nota:''});
+    renderCart();
+    debounceSaveDraft();
+    document.getElementById('man-ref').value='';
+    document.getElementById('man-cant').value=1;
+    document.getElementById('man-valor').value='';
+  });
+
+  document.getElementById('btn-pend-add').addEventListener('click', ()=>{
+    const desc = document.getElementById('pend-desc').value.trim();
+    const color = document.getElementById('pend-color').value.trim();
+    const cant = Math.max(1, Number(document.getElementById('pend-cant').value)||1);
+    if(!desc){ notify('Escribe el artículo o descripción.'); return; }
+    pendientes.push({descripcion:desc, color, cantidad:cant});
+    renderPendientes();
+    document.getElementById('pend-desc').value='';
+    document.getElementById('pend-color').value='';
+    document.getElementById('pend-cant').value=1;
+  });
+
+  function renderPendientes(){
+    const ticket = document.getElementById('pend-ticket');
+    const list = document.getElementById('pend-list');
+    if(!pendientes.length){
+      ticket.style.display = 'none';
+      return;
+    }
+    ticket.style.display = 'block';
+    document.getElementById('pend-count').textContent = pendientes.length + (pendientes.length===1?' ítem':' ítems');
+    list.innerHTML = pendientes.map((p,i)=>`
+      <div class="item">
+        <div class="info">
+          <div class="ref">${escapeHtml(p.descripcion)}</div>
+          <div class="price">${p.color?escapeHtml(p.color)+' · ':''}cantidad ${p.cantidad}</div>
+        </div>
+        <button class="rm" data-i="${i}">×</button>
+      </div>
+    `).join('');
+  }
+  document.getElementById('pend-list').addEventListener('click', (e)=>{
+    const btn = e.target.closest('button[data-i]');
+    if(!btn) return;
+    pendientes.splice(Number(btn.dataset.i), 1);
+    renderPendientes();
+  });
+
+  document.getElementById('btn-pend-copy').addEventListener('click', async ()=>{
+    const nit = document.getElementById('in-nit').value.trim();
+    let text = 'PENDIENTES SIN CÓDIGO' + (nit?' — cliente NIT '+nit:'') + '\n';
+    text += pendientes.map(p=>`- ${p.descripcion}${p.color?' ('+p.color+')':''} x${p.cantidad}`).join('\n');
+    try{
+      await navigator.clipboard.writeText(text);
+      flashButton('btn-pend-copy', 'Copiado ✓');
+    }catch(e){
+      notify('No pude copiar automáticamente. Mantén presionada la lista para copiarla manualmente.');
+    }
+  });
+
+  document.getElementById('btn-clear').addEventListener('click', ()=>{
+    if(!cart.length && !pendientes.length) return;
+    if(confirm('¿Vaciar el pedido actual (incluye los pendientes sin código)?')){
+      cart = [];
+      pendientes = [];
+      renderCart();
+      renderPendientes();
+      lsSet('tp_draft', null);
+    }
+  });
+
+  function flashButton(id, text){
+    const btn = document.getElementById(id);
+    const original = btn.textContent;
+    btn.textContent = text;
+    setTimeout(()=>{ btn.textContent = original; }, 1200);
+  }
+
+  document.getElementById('in-nit').addEventListener('input', debounceSaveDraft);
+
+  function updateExportState(){
+    const nit = document.getElementById('in-nit').value.trim();
+    document.getElementById('btn-export').disabled = !(nit && selectedLista && cart.length);
+  }
+
+  // ---------- Export to Excel (matches Saya "detalle" template) ----------
+  function buildPedidoWorkbook(nit, lista, cartData){
+    const data = [
+      ["DETALLE MOVIMIENTO","","","",""],
+      ["referenciaProducto","cantidadProducto","listaPrecioProducto","valorProducto","observacionProducto"],
+      ["Referencia Producto","Cantidad Producto","Código Alterno Lista Precio","Valor Producto","Observación"],
+      ...cartData.map(it=>[it.referencia, it.cantidad, lista, it.valor, it.nota||''])
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(data);
+    ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:4}}];
+    ws['!cols'] = [{wch:24},{wch:18},{wch:26},{wch:16},{wch:22}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "detalle");
+    return wb;
+  }
+
+  function nombreArchivoPedido(nit, fecha){
+    const stamp = fecha.toISOString().slice(0,16).replace('T','_').replace(':','h');
+    return `pedido_${nit.replace(/[^a-zA-Z0-9-]/g,'')}_${stamp}.xlsx`;
+  }
+
+  // Intenta compartir directo (WhatsApp, correo, Drive, lo que tenga el celular).
+  // Si el navegador no lo soporta (típico en computador), simplemente se descarga.
+  async function compartirOdescargarPedido(wb, filename, nit, lista){
+    // Dentro de la app empaquetada (Android), usar el compartir NATIVO real del
+    // sistema operativo — el mismo mecanismo confiable que usan las apps instaladas,
+    // en vez del navigator.share() del navegador (que ha fallado en algunos celulares).
+    const esAppNativa = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    if(esAppNativa){
+      try{
+        const base64 = XLSX.write(wb, {bookType:'xlsx', type:'base64'});
+        const Filesystem = window.Capacitor.Plugins.Filesystem;
+        const Share = window.Capacitor.Plugins.Share;
+        const escrito = await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+        await Share.share({ title: 'Pedido ' + nit, url: escrito.uri });
+        return;
+      }catch(err){
+        console.warn('Compartir nativo falló, se intenta el respaldo del navegador:', err);
+        // sigue abajo al respaldo web, por si acaso.
+      }
+    }
+
+    let compartido = false;
+    let motivo = '';
+    try{
+      const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
+      const file = new File([wbout], filename, {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      if(!navigator.share){
+        motivo = 'Este navegador no tiene la función de compartir (navigator.share no existe).';
+      } else if(!navigator.canShare){
+        motivo = 'Este navegador no puede verificar si soporta compartir archivos (navigator.canShare no existe).';
+      } else if(!navigator.canShare({files:[file]})){
+        motivo = 'El navegador dice que no puede compartir este archivo (canShare devolvió falso).';
+      } else {
+        await navigator.share({files:[file]});
+        compartido = true;
+      }
+    }catch(err){
+      if(err && err.name === 'AbortError'){ compartido = true; /* el vendedor canceló el share, no es un error */ }
+      else motivo = 'navigator.share falló: ' + (err && (err.name||err.message) ? (err.name||'')+' '+(err.message||'') : err);
+    }
+    if(!compartido){
+      if(motivo) console.warn('Compartir no disponible, se descargó en su lugar:', motivo);
+      XLSX.writeFile(wb, filename);
+    }
+  }
+
+  document.getElementById('btn-export').addEventListener('click', async ()=>{
+    const nit = document.getElementById('in-nit').value.trim();
+    if(!nit || !selectedLista || !cart.length) return;
+
+    const now = new Date();
+    const filename = nombreArchivoPedido(nit, now);
+    const wb = buildPedidoWorkbook(nit, selectedLista, cart);
+    await compartirOdescargarPedido(wb, filename, nit, selectedLista);
+
+    const total = cart.reduce((a,b)=>a+b.cantidad*b.valor,0);
+    const record = {
+      nit, lista:selectedLista, fecha: now.toISOString(),
+      items: cart.reduce((a,b)=>a+b.cantidad,0), total, filename,
+      cart: cart.map(it=>({referencia:it.referencia, cantidad:it.cantidad, valor:it.valor, nota:it.nota||''}))
+    };
+    historial.unshift(record);
+    historial = historial.slice(0,100);
+    lsSet('tp_historial', historial);
+    renderHistory();
+
+    if(confirm('Pedido generado. ¿Vaciar el pedido para empezar uno nuevo?')){
+      cart = [];
+      pendientes = [];
+      document.getElementById('in-nit').value = '';
+      renderCart();
+      renderPendientes();
+      lsSet('tp_draft', null);
+    }
+  });
+
+  // ---------- History ----------
+  // ---------- Fotos (catálogo visual) ----------
+  function buscarFotos(query){
+    const el = document.getElementById('fotos-resultados');
+    query = (query||'').trim().toLowerCase();
+    if(query.length < 2){
+      el.innerHTML = '<div class="muted" style="padding:10px 2px;">Escribe al menos 2 caracteres para buscar.</div>';
+      return;
+    }
+    if(!catalog.length){
+      el.innerHTML = '<div class="muted" style="padding:10px 2px;">Carga el catálogo primero en la pestaña "Catálogo".</div>';
+      return;
+    }
+    const matched = catalog.filter(c=>
+      (c.articulo && c.articulo.toLowerCase().includes(query)) ||
+      (c.referencia && c.referencia.toLowerCase().includes(query)) ||
+      (c.descripcion && c.descripcion.toLowerCase().includes(query))
+    );
+    const grupos = {};
+    matched.forEach(c=>{
+      const key = c.articulo || c.referencia;
+      if(!grupos[key]) grupos[key] = { articulo:key, descripcion:c.descripcion||'', precios:{} };
+      grupos[key].precios[c.lista] = c.valor;
+    });
+    const keys = Object.keys(grupos).slice(0,30);
+    if(!keys.length){
+      el.innerHTML = '<div class="muted" style="padding:10px 2px;">No encontré productos con ese texto.</div>';
+      return;
+    }
+    el.innerHTML = keys.map(k=>{
+      const g = grupos[k];
+      const precios = Object.keys(g.precios).map(l=>`<span>${escapeHtml(l)}: <b>${money(g.precios[l])}</b></span>`).join('');
+      const imgUrlJpg = 'fotos/' + encodeURIComponent(g.articulo) + '.jpg';
+      const imgUrlPng = 'fotos/' + encodeURIComponent(g.articulo) + '.png';
+      return `
+        <div class="foto-card">
+          <div class="foto-img">
+            <img src="${imgUrlJpg}" alt="${escapeAttr(g.articulo)}" loading="lazy" data-png="${escapeAttr(imgUrlPng)}" data-tried-png="0"
+                 onerror="if(this.dataset.triedPng==='0'){this.dataset.triedPng='1';this.src=this.dataset.png;}else{this.style.display='none';this.parentElement.classList.add('no-foto');}">
+          </div>
+          <div class="foto-info">
+            <div class="foto-codigo">${escapeHtml(g.articulo)}</div>
+            <div class="foto-desc">${escapeHtml(g.descripcion)}</div>
+            <div class="foto-precios">${precios}</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+    if(keys.length===30){
+      el.innerHTML += '<div class="muted" style="padding:6px 2px;">Mostrando los primeros 30 resultados — afina la búsqueda para ver menos.</div>';
+    }
+  }
+
+  let fotosSearchTimer = null;
+  document.getElementById('fotos-buscar').addEventListener('input', (e)=>{
+    clearTimeout(fotosSearchTimer);
+    const val = e.target.value;
+    fotosSearchTimer = setTimeout(()=>buscarFotos(val), 200);
+  });
+
+  function renderHistory(){
+    const el = document.getElementById('hist-list');
+    if(!historial.length){
+      el.innerHTML = '<div class="muted" style="padding:8px 2px;">Aquí quedan guardados los pedidos que generes en este celular.</div>';
+      return;
+    }
+    el.innerHTML = historial.map((h,i)=>`
+      <div class="hist-item">
+        <div class="row1"><span>NIT ${escapeHtml(h.nit)}</span><span>${money(h.total)}</span></div>
+        <div class="row2"><span>${new Date(h.fecha).toLocaleString('es-CO',{dateStyle:'medium',timeStyle:'short'})}</span><span>${h.items} ítems · ${escapeHtml(h.lista)}</span></div>
+        <button class="btn btn-outline btn-sm" style="width:100%;margin-top:9px;" data-hist-share="${i}">Compartir</button>
+      </div>
+    `).join('');
+  }
+
+  document.getElementById('hist-list').addEventListener('click', async (e)=>{
+    const btn = e.target.closest('button[data-hist-share]');
+    if(!btn) return;
+    const record = historial[Number(btn.dataset.histShare)];
+    if(!record){ notify('No encontré los datos de ese pedido.'); return; }
+    if(!record.cart || !record.cart.length){ notify('Este pedido es de una versión anterior y no guardó los productos, así que no se puede volver a compartir.'); return; }
+    const original = btn.textContent;
+    btn.textContent = 'Preparando…';
+    try{
+      const wb = buildPedidoWorkbook(record.nit, record.lista, record.cart);
+      await compartirOdescargarPedido(wb, record.filename, record.nit, record.lista);
+    } finally {
+      btn.textContent = original;
+    }
+  });
+
+  // ---------- Scanner: video en vivo primero; si falla, respaldo por foto ----------
+  let scannerRunning = false;
+  let scanCooldown = false;
+
+  document.getElementById('btn-open-scan').addEventListener('click', async ()=>{
+    if(!catalog.length){
+      const saved = await loadEmbeddedCatalog();
+      if(saved && saved.length){
+        catalog = saved;
+        renderCatalogStats();
+        populateListaSelect();
+        populateRefDatalist();
+      }
+    }
+    if(!catalog.length){ notify('Primero carga el catálogo en la pestaña "Catálogo".'); return; }
+    if(!selectedLista){ notify('Selecciona una lista de precios antes de escanear.'); return; }
+    if(typeof Html5Qrcode === 'undefined'){
+      notify('El lector de códigos todavía no terminó de cargar (revisa tu conexión) — espera unos segundos y toca "Escanear producto" de nuevo.');
+      return;
+    }
+    await startLiveScanner();
+  });
+
+  async function startLiveScanner(){
+    try{
+      document.getElementById('scan-overlay').classList.add('active');
+      document.getElementById('scan-lista-label').textContent = 'Lista: ' + selectedLista;
+      sessionScanCount = 0;
+      // Espera un frame a que el overlay (antes display:none) termine de mostrarse,
+      // para que el contenedor #reader ya tenga un tamaño real al medirlo.
+      await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+      html5Qrcode = new Html5Qrcode("reader", {
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.CODE_128
+        ]
+      });
+      const startPromise = html5Qrcode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: { width: 260, height: 160 } },
+        onLiveScanSuccess,
+        ()=>{}
+      );
+      const timeoutPromise = new Promise((_, rej)=>setTimeout(()=>rej(new Error('timeout')), 8000));
+      await Promise.race([startPromise, timeoutPromise]);
+      scannerRunning = true;
+    }catch(err){
+      closeLiveScanner();
+      // Respaldo: si el video en vivo no funciona aquí (p.ej. dentro del iframe de
+      // Claude), usar captura de foto en su lugar, sin interrumpir al vendedor.
+      document.getElementById('scan-file-input').click();
+    }
+  }
+
+  function playBeep(){
+    try{
+      const ctx = new (window.AudioContext || window.webkitAudioContext)();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.value = 1400;
+      gain.gain.setValueAtTime(0.25, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.15);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+      osc.onended = ()=>ctx.close();
+    }catch(e){ /* audio no disponible, seguir sin sonido */ }
+  }
+
+  function onLiveScanSuccess(decodedText){
+    if(scanCooldown) return;
+    scanCooldown = true;
+    // Pausar de inmediato evita que un código muy nítido se siga leyendo mientras cerramos.
+    try{ if(html5Qrcode && scannerRunning) html5Qrcode.pause(true); }catch(e){}
+    if(navigator.vibrate) navigator.vibrate(60);
+    playBeep();
+    handleScannedCode(decodedText.trim());
+    sessionScanCount++;
+    closeLiveScanner();
+  }
+
+  function closeLiveScanner(){
+    document.getElementById('scan-overlay').classList.remove('active');
+    if(html5Qrcode){
+      if(scannerRunning){
+        try{
+          html5Qrcode.stop()
+            .then(()=>{ try{ html5Qrcode && html5Qrcode.clear(); }catch(e){} })
+            .catch(()=>{});
+        }catch(e){ /* ya no estaba corriendo */ }
+      }
+      scannerRunning = false;
+      html5Qrcode = null;
+    }
+    scanCooldown = false;
+  }
+  document.getElementById('btn-close-scan').addEventListener('click', closeLiveScanner);
+
+  // Respaldo por foto (usa la misma instancia/lógica de decodificación)
+  document.getElementById('scan-file-input').addEventListener('change', async (e)=>{
+    const file = e.target.files[0];
+    e.target.value = '';
+    if(!file) return;
+    document.getElementById('scan-processing').classList.add('show');
+    try{
+      if(!html5Qrcode) html5Qrcode = new Html5Qrcode("reader");
+      const decodedText = await html5Qrcode.scanFile(file, false);
+      if(navigator.vibrate) navigator.vibrate(60);
+      playBeep();
+      handleScannedCode(decodedText.trim());
+    }catch(err){
+      showToast('warn', 'No pude leer ningún código en la foto', 'Intenta de nuevo, más cerca y con buena luz');
+    }finally{
+      document.getElementById('scan-processing').classList.remove('show');
+    }
+  });
+
+  function handleScannedCode(code){
+    const matchLista = catalog.find(c=>c.codigo===code && c.lista===selectedLista);
+    if(matchLista){
+      addToCart(matchLista.referencia, matchLista.valor);
+      showToast('ok', matchLista.referencia, money(matchLista.valor));
+      return true;
+    }
+    const matchAny = catalog.find(c=>c.codigo===code);
+    if(matchAny){
+      showToast('warn', matchAny.referencia, 'sin precio en "'+selectedLista+'"');
+      return false;
+    }
+    // ¿Es un código de referencia base (surtido)? Trae todas las tallas de ese artículo.
+    // Ignora ceros extra a la izquierda: un EAN-13 generado para un código corto
+    // (ej. "1510960") suele rellenarse con ceros para completar 13 dígitos.
+    const codeNum = /^\d+$/.test(code) ? code.replace(/^0+/, '') : code;
+    const surtidoRows = catalog.filter(c=>{
+      if(!c.articulo || c.lista!==selectedLista) return false;
+      if(c.articulo === code) return true;
+      const articuloNum = /^\d+$/.test(c.articulo) ? c.articulo.replace(/^0+/, '') : c.articulo;
+      return articuloNum === codeNum && codeNum !== '';
+    });
+    if(surtidoRows.length){
+      openSurtidoPanel(code, surtidoRows);
+      return true;
+    }
+    showToast('warn', 'Código no encontrado', code);
+    return false;
+  }
+
+  const TALLA_ORDEN = ['XS','S','M','L','XL','XXL','XXXL','U','UNICA','ÚNICA'];
+  function ordenarTallas(a, b){
+    const na = Number(a), nb = Number(b);
+    if(!isNaN(na) && !isNaN(nb)) return na - nb;
+    const ia = TALLA_ORDEN.indexOf(a.toUpperCase());
+    const ib = TALLA_ORDEN.indexOf(b.toUpperCase());
+    if(ia!==-1 && ib!==-1) return ia - ib;
+    if(ia!==-1) return -1;
+    if(ib!==-1) return 1;
+    return a.localeCompare(b);
+  }
+
+  // El código de color va "incrustado" en la referencia, entre el artículo y la talla
+  // (ej. 1510960 + SU + S = "1510960SUS"). "SU" es el color genérico de surtido.
+  function colorDeFila(r){
+    if(r.articulo && r.talla && r.referencia.startsWith(r.articulo) && r.referencia.endsWith(r.talla)){
+      return r.referencia.slice(r.articulo.length, r.referencia.length - r.talla.length);
+    }
+    return '';
+  }
+
+  function agruparPorTallaSurtido(rows){
+    // Prioriza el color genérico "SU" (surtido); si un artículo no lo tiene, usa lo que haya.
+    const surtido = rows.filter(r=>colorDeFila(r).toUpperCase().startsWith('SU'));
+    const base = surtido.length ? surtido : rows;
+    const porTalla = {};
+    base.forEach(r=>{ if(!porTalla[r.talla||'—']) porTalla[r.talla||'—'] = r; });
+    return porTalla;
+  }
+
+  function openSurtidoPanel(articulo, rows){
+    const porTalla = agruparPorTallaSurtido(rows);
+    const tallas = Object.keys(porTalla).sort(ordenarTallas);
+    document.getElementById('surtido-title').textContent = 'Referencia ' + articulo;
+    document.getElementById('surtido-sub').textContent = tallas.length + ' tallas disponibles · lista ' + selectedLista;
+    document.getElementById('surtido-rows').innerHTML = tallas.map(t=>`
+      <div class="field-row" style="align-items:center;">
+        <div style="flex:0 0 70px;font-weight:700;font-family:var(--mono);">${escapeHtml(t)}</div>
+        <div style="flex:1;">
+          <input type="number" min="0" data-talla="${escapeAttr(t)}" placeholder="0">
+        </div>
+      </div>
+    `).join('');
+    document.getElementById('surtido-total').value = '';
+    document.getElementById('surtido-panel').dataset.articulo = articulo;
+    document.getElementById('surtido-overlay').classList.add('show');
+  }
+
+  document.getElementById('btn-surtido-distribuir').addEventListener('click', ()=>{
+    const total = Math.max(0, Math.floor(Number(document.getElementById('surtido-total').value)||0));
+    const inputs = document.querySelectorAll('#surtido-rows input[data-talla]');
+    if(total<=0 || !inputs.length) return;
+    const base = Math.floor(total / inputs.length);
+    let resto = total - base*inputs.length;
+    inputs.forEach(input=>{
+      let cant = base;
+      if(resto>0){ cant += 1; resto--; }
+      input.value = cant>0 ? cant : '';
+    });
+  });
+
+  document.getElementById('btn-surtido-cancel').addEventListener('click', ()=>{
+    document.getElementById('surtido-overlay').classList.remove('show');
+  });
+
+  document.getElementById('btn-surtido-add').addEventListener('click', ()=>{
+    const articulo = document.getElementById('surtido-panel').dataset.articulo;
+    const rows = catalog.filter(c=>c.articulo===articulo && c.lista===selectedLista);
+    const porTalla = agruparPorTallaSurtido(rows);
+    let added = 0;
+    document.querySelectorAll('#surtido-rows input[data-talla]').forEach(input=>{
+      const cant = Math.max(0, Number(input.value)||0);
+      if(cant<=0) return;
+      const row = porTalla[input.dataset.talla];
+      if(!row) return;
+      cart.push({referencia:row.referencia, cantidad:cant, valor:row.valor, nota:''});
+      added++;
+    });
+    document.getElementById('surtido-overlay').classList.remove('show');
+    if(added){
+      renderCart();
+      debounceSaveDraft();
+      showToast('ok', 'Surtido agregado', added + (added===1?' talla':' tallas'));
+    }
+  });
+
+  function showToast(type, title, sub){
+    const t = document.getElementById('scan-toast');
+    t.className = 'toast show ' + type;
+    document.getElementById('scan-toast-text').innerHTML = escapeHtml(title) + (sub?`<small>${escapeHtml(sub)}</small>`:'');
+    clearTimeout(t._hideTimer);
+    t._hideTimer = setTimeout(()=>{ t.classList.remove('show'); }, 2200);
+  }
+
+  // ---------- Init ----------
+  async function init(){
+    try{
+      const embedded = await loadEmbeddedCatalog();
+      if(embedded.length){
+        catalog = embedded;
+        renderCatalogStats();
+        populateListaSelect();
+        populateRefDatalist();
+      }
+      const draft = lsGet('tp_draft', null);
+      if(draft){
+        if(draft.nit) document.getElementById('in-nit').value = draft.nit;
+        if(draft.cart && draft.cart.length) cart = draft.cart;
+        if(draft.pendientes && draft.pendientes.length) pendientes = draft.pendientes;
+        if(draft.lista){
+          selectedLista = draft.lista;
+          document.getElementById('in-lista').value = draft.lista;
+        }
+        renderCart();
+        renderPendientes();
+      }
+      updateExportState();
+    }catch(err){
+      notify('No pude iniciar la app: ' + (err && err.message ? err.message : err));
+    }
+  }
+  init();
+
+})();
+</script>
+</body>
+</html>

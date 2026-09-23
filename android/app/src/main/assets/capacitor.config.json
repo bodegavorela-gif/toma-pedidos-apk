@@ -1,0 +1,11 @@
+{
+	"appId": "com.vorela.tomapedidos",
+	"appName": "Toma de Pedidos",
+	"webDir": "www",
+	"android": {
+		"allowMixedContent": false
+	},
+	"server": {
+		"androidScheme": "https"
+	}
+}
