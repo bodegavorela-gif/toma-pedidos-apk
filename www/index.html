@@ -11,11 +11,11 @@
 <script src="native/capacitor-filesystem.js"></script>
 <style>
   :root{
-    --ink:#1A1A1A;
-    --paper:#F5F1EB;
+    --ink:#161B22;
+    --paper:#F1F3F5;
     --paper-2:#FFFFFF;
-    --line:#E8D5C4;
-    --accent:#7D4747;
+    --line:#D7DCE1;
+    --accent:#E63946;
     --accent-ink:#FFFFFF;
     --ok:#2A9D8F;
     --warn:#C97A1B;
@@ -54,11 +54,12 @@
   .card h2{font-size:13px;text-transform:uppercase;letter-spacing:.08em;color:#6B7480;margin-bottom:12px;font-weight:700;}
 
   label{display:block;font-size:12.5px;font-weight:600;color:#4A525C;margin-bottom:5px;}
-  input[type=text],input[type=number],select{
+  input[type=text],input[type=number],select,textarea{
     width:100%;padding:11px 12px;border:1.5px solid var(--line);border-radius:8px;
     font-size:15.5px;font-family:var(--sans);background:#fff;color:var(--ink);margin-bottom:12px;
   }
-  input[type=text]:focus,input[type=number]:focus,select:focus{outline:none;border-color:var(--ink);}
+  textarea{resize:vertical;min-height:70px;}
+  input[type=text]:focus,input[type=number]:focus,select:focus,textarea:focus{outline:none;border-color:var(--ink);}
   .field-row{display:flex;gap:10px;}
   .field-row > div{flex:1;}
 
@@ -77,32 +78,32 @@
   .btn-row .btn{flex:1;}
 
   .muted{color:#8A94A0;font-size:13px;line-height:1.5;}
-  .pill{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:20px;background:#F3E9DE;color:#5A6270;font-weight:600;}
+  .pill{display:inline-block;font-family:var(--mono);font-size:10.5px;padding:2px 8px;border-radius:20px;background:#EEF1F3;color:#5A6270;font-weight:600;}
   .pill.ok{background:#E4F3F1;color:var(--ok);}
   .pill.warn{background:#FBEEDF;color:var(--warn);}
 
   /* Catalog */
   .drop{
     border:1.5px dashed var(--line);border-radius:9px;padding:22px 14px;text-align:center;
-    background:#FAF6F0;
+    background:#FAFBFC;
   }
   .drop input{display:none;}
   .drop .icon{font-size:26px;margin-bottom:6px;}
   .cat-stats{display:flex;gap:10px;margin-top:12px;}
-  .cat-stats .stat{flex:1;background:#FAF6F0;border:1px solid var(--line);border-radius:8px;padding:10px 8px;text-align:center;}
+  .cat-stats .stat{flex:1;background:#FAFBFC;border:1px solid var(--line);border-radius:8px;padding:10px 8px;text-align:center;}
   .cat-stats .stat b{display:block;font-family:var(--mono);font-size:19px;}
   .cat-stats .stat span{font-size:10.5px;color:#8A94A0;text-transform:uppercase;letter-spacing:.05em;}
 
   /* Cart - ticket style */
   .ticket{background:var(--paper-2);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:14px;}
-  .ticket-head{padding:12px 14px;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;background:#FAF6F0;}
+  .ticket-head{padding:12px 14px;border-bottom:1px dashed var(--line);display:flex;justify-content:space-between;align-items:center;background:#FAFBFC;}
   .ticket-head span{font-family:var(--mono);font-size:11px;color:#8A94A0;text-transform:uppercase;letter-spacing:.06em;}
-  .item{padding:12px 14px;border-bottom:1px solid #F0E4D8;}
+  .item{padding:12px 14px;border-bottom:1px solid #EEF0F2;}
   .item .item-row{display:flex;align-items:center;gap:10px;}
   .item .item-note{margin-top:8px;}
   .item .item-note input{
     width:100%;padding:7px 10px;margin:0;border:1.5px dashed var(--line);border-radius:7px;
-    font-size:13px;color:#4A525C;background:#FAF6F0;
+    font-size:13px;color:#4A525C;background:#FAFBFC;
   }
   .item .item-note input:focus{outline:none;border-color:var(--accent);border-style:solid;}
   .item:last-child{border-bottom:none;}
@@ -180,7 +181,7 @@
   /* history */
   /* fotos */
   .foto-card{background:var(--paper-2);border:1px solid var(--line);border-radius:10px;overflow:hidden;margin-bottom:12px;display:flex;}
-  .foto-card .foto-img{width:110px;height:110px;flex-shrink:0;background:#F3E9DE;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+  .foto-card .foto-img{width:110px;height:110px;flex-shrink:0;background:#EEF1F3;display:flex;align-items:center;justify-content:center;overflow:hidden;}
   .foto-card .foto-img img{width:100%;height:100%;object-fit:cover;}
   .foto-card .foto-img .sin-foto{font-size:10.5px;color:#9AA4AF;text-align:center;padding:6px;font-family:var(--mono);}
   .foto-card .foto-img.no-foto::after{content:'Sin foto';font-family:var(--mono);font-size:10.5px;color:#9AA4AF;}
@@ -188,7 +189,7 @@
   .foto-card .foto-codigo{font-family:var(--mono);font-weight:700;font-size:14px;}
   .foto-card .foto-desc{font-size:13px;color:#4A525C;margin-top:2px;}
   .foto-card .foto-precios{margin-top:8px;display:flex;flex-wrap:wrap;gap:6px;}
-  .foto-card .foto-precios span{font-family:var(--mono);font-size:11px;background:#F3E9DE;border-radius:6px;padding:3px 7px;}
+  .foto-card .foto-precios span{font-family:var(--mono);font-size:11px;background:#EEF1F3;border-radius:6px;padding:3px 7px;}
   .foto-card .foto-precios span b{color:var(--ink);}
 
   .hist-item{background:var(--paper-2);border:1px solid var(--line);border-radius:9px;padding:12px 14px;margin-bottom:9px;}
@@ -212,7 +213,7 @@
     <div class="sub" id="header-sub">sin catálogo cargado</div>
   </header>
 
-  <div id="app-msg" style="display:none;position:sticky;top:0;z-index:50;background:#7D4747;color:#fff;padding:12px 16px;font-size:13px;line-height:1.5;">
+  <div id="app-msg" style="display:none;position:sticky;top:0;z-index:50;background:#C0152F;color:#fff;padding:12px 16px;font-size:13px;line-height:1.5;">
     <div id="app-msg-text" style="white-space:pre-line;"></div>
     <button id="app-msg-close" style="margin-top:8px;background:rgba(255,255,255,.18);border:none;color:#fff;border-radius:16px;padding:6px 14px;font-size:12px;font-weight:700;">Entendido</button>
   </div>
@@ -303,6 +304,11 @@
           <span>Total pedido</span>
           <b id="cart-total">$0</b>
         </div>
+      </div>
+
+      <div class="card">
+        <label for="in-obs-general">Observación general del pedido (opcional)</label>
+        <textarea id="in-obs-general" placeholder="Ej: entregar antes del viernes, cliente pide factura separada, etc." style="margin-bottom:0;"></textarea>
       </div>
 
       <button class="btn btn-ghost" id="btn-clear">Vaciar pedido</button>
@@ -419,7 +425,6 @@
 
   // ---------- State ----------
   let catalog = [];          // [{codigo, referencia, lista, valor}]
-  let fotosDrive = {};       // {codigo: driveFileId}
   let cart = [];              // [{referencia, cantidad, valor}]
   let pendientes = [];        // [{descripcion, color, cantidad}] — no va al Excel
   let selectedLista = "";
@@ -448,7 +453,8 @@
         nit: document.getElementById('in-nit').value,
         lista: selectedLista,
         cart,
-        pendientes
+        pendientes,
+        obsGeneral: document.getElementById('in-obs-general').value
       });
     }, 400);
   }
@@ -639,6 +645,10 @@
     updateExportState();
   });
 
+  document.getElementById('in-obs-general').addEventListener('input', ()=>{
+    debounceSaveDraft();
+  });
+
   function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function escapeAttr(s){ return escapeHtml(s); }
 
@@ -820,7 +830,7 @@
   }
 
   // ---------- Export to Excel (matches Saya "detalle" template) ----------
-  function buildPedidoWorkbook(nit, lista, cartData){
+  function buildPedidoWorkbook(nit, lista, cartData, obsGeneral){
     const data = [
       ["DETALLE MOVIMIENTO","","","",""],
       ["referenciaProducto","cantidadProducto","listaPrecioProducto","valorProducto","observacionProducto"],
@@ -831,7 +841,18 @@
     ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:4}}];
     ws['!cols'] = [{wch:24},{wch:18},{wch:26},{wch:16},{wch:22}];
     const wb = XLSX.utils.book_new();
+    // Esta hoja "detalle" es la que se sube a Saya: no se le agrega nada extra
+    // para no romper la carga masiva. La observación general del pedido (si hay)
+    // va en una hoja aparte, solo de referencia para quien recibe el pedido.
     XLSX.utils.book_append_sheet(wb, ws, "detalle");
+    if(obsGeneral && obsGeneral.trim()){
+      const wsObs = XLSX.utils.aoa_to_sheet([
+        ["Observación general del pedido"],
+        [obsGeneral.trim()]
+      ]);
+      wsObs['!cols'] = [{wch:60}];
+      XLSX.utils.book_append_sheet(wb, wsObs, "observacion");
+    }
     return wb;
   }
 
@@ -842,7 +863,7 @@
 
   // Intenta compartir directo (WhatsApp, correo, Drive, lo que tenga el celular).
   // Si el navegador no lo soporta (típico en computador), simplemente se descarga.
-  async function compartirOdescargarPedido(wb, filename, nit, lista){
+  async function compartirOdescargarPedido(wb, filename, nit, lista, obsGeneral){
     // Dentro de la app empaquetada (Android), usar el compartir NATIVO real del
     // sistema operativo — el mismo mecanismo confiable que usan las apps instaladas,
     // en vez del navigator.share() del navegador (que ha fallado en algunos celulares).
@@ -853,7 +874,9 @@
         const Filesystem = window.Capacitor.Plugins.Filesystem;
         const Share = window.Capacitor.Plugins.Share;
         const escrito = await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
-        await Share.share({ title: 'Pedido ' + nit, url: escrito.uri });
+        const shareOpts = { title: 'Pedido ' + nit, url: escrito.uri };
+        if(obsGeneral && obsGeneral.trim()) shareOpts.text = 'Observación general: ' + obsGeneral.trim();
+        await Share.share(shareOpts);
         return;
       }catch(err){
         console.warn('Compartir nativo falló, se intenta el respaldo del navegador:', err);
@@ -866,6 +889,8 @@
     try{
       const wbout = XLSX.write(wb, {bookType:'xlsx', type:'array'});
       const file = new File([wbout], filename, {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+      const shareData = {files:[file]};
+      if(obsGeneral && obsGeneral.trim()) shareData.text = 'Observación general: ' + obsGeneral.trim();
       if(!navigator.share){
         motivo = 'Este navegador no tiene la función de compartir (navigator.share no existe).';
       } else if(!navigator.canShare){
@@ -873,7 +898,7 @@
       } else if(!navigator.canShare({files:[file]})){
         motivo = 'El navegador dice que no puede compartir este archivo (canShare devolvió falso).';
       } else {
-        await navigator.share({files:[file]});
+        await navigator.share(shareData);
         compartido = true;
       }
     }catch(err){
@@ -890,16 +915,18 @@
     const nit = document.getElementById('in-nit').value.trim();
     if(!nit || !selectedLista || !cart.length) return;
 
+    const obsGeneral = document.getElementById('in-obs-general').value.trim();
     const now = new Date();
     const filename = nombreArchivoPedido(nit, now);
-    const wb = buildPedidoWorkbook(nit, selectedLista, cart);
-    await compartirOdescargarPedido(wb, filename, nit, selectedLista);
+    const wb = buildPedidoWorkbook(nit, selectedLista, cart, obsGeneral);
+    await compartirOdescargarPedido(wb, filename, nit, selectedLista, obsGeneral);
 
     const total = cart.reduce((a,b)=>a+b.cantidad*b.valor,0);
     const record = {
       nit, lista:selectedLista, fecha: now.toISOString(),
       items: cart.reduce((a,b)=>a+b.cantidad,0), total, filename,
-      cart: cart.map(it=>({referencia:it.referencia, cantidad:it.cantidad, valor:it.valor, nota:it.nota||''}))
+      cart: cart.map(it=>({referencia:it.referencia, cantidad:it.cantidad, valor:it.valor, nota:it.nota||''})),
+      obsGeneral
     };
     historial.unshift(record);
     historial = historial.slice(0,100);
@@ -910,6 +937,7 @@
       cart = [];
       pendientes = [];
       document.getElementById('in-nit').value = '';
+      document.getElementById('in-obs-general').value = '';
       renderCart();
       renderPendientes();
       lsSet('tp_draft', null);
@@ -948,14 +976,13 @@
     el.innerHTML = keys.map(k=>{
       const g = grupos[k];
       const precios = Object.keys(g.precios).map(l=>`<span>${escapeHtml(l)}: <b>${money(g.precios[l])}</b></span>`).join('');
-      const fileId = fotosDrive[g.articulo];
-      const imgTag = fileId
-        ? `<img src="https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w400" alt="${escapeAttr(g.articulo)}" loading="lazy" onerror="this.style.display='none';this.parentElement.classList.add('no-foto')">`
-        : '';
+      const imgUrlJpg = 'fotos/' + encodeURIComponent(g.articulo) + '.jpg';
+      const imgUrlPng = 'fotos/' + encodeURIComponent(g.articulo) + '.png';
       return `
         <div class="foto-card">
-          <div class="foto-img${fileId?'':' no-foto'}">
-            ${imgTag}
+          <div class="foto-img">
+            <img src="${imgUrlJpg}" alt="${escapeAttr(g.articulo)}" loading="lazy" data-png="${escapeAttr(imgUrlPng)}" data-tried-png="0"
+                 onerror="if(this.dataset.triedPng==='0'){this.dataset.triedPng='1';this.src=this.dataset.png;}else{this.style.display='none';this.parentElement.classList.add('no-foto');}">
           </div>
           <div class="foto-info">
             <div class="foto-codigo">${escapeHtml(g.articulo)}</div>
@@ -1001,8 +1028,8 @@
     const original = btn.textContent;
     btn.textContent = 'Preparando…';
     try{
-      const wb = buildPedidoWorkbook(record.nit, record.lista, record.cart);
-      await compartirOdescargarPedido(wb, record.filename, record.nit, record.lista);
+      const wb = buildPedidoWorkbook(record.nit, record.lista, record.cart, record.obsGeneral);
+      await compartirOdescargarPedido(wb, record.filename, record.nit, record.lista, record.obsGeneral);
     } finally {
       btn.textContent = original;
     }
@@ -1271,15 +1298,11 @@
           selectedLista = draft.lista;
           document.getElementById('in-lista').value = draft.lista;
         }
+        if(draft.obsGeneral) document.getElementById('in-obs-general').value = draft.obsGeneral;
         renderCart();
         renderPendientes();
       }
       updateExportState();
-      // El mapa de fotos es opcional: si falla, la pestaña Fotos simplemente no mostrará imágenes.
-      try{
-        const res = await fetch('fotos_drive.json', {cache:'no-cache'});
-        if(res.ok) fotosDrive = await res.json();
-      }catch(e){ console.warn('No se pudo cargar fotos_drive.json', e); }
     }catch(err){
       notify('No pude iniciar la app: ' + (err && err.message ? err.message : err));
     }
