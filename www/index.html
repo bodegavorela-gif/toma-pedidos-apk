@@ -830,12 +830,26 @@
   }
 
   // ---------- Export to Excel (matches Saya "detalle" template) ----------
+  // Saya no recibe el nombre de la lista tal cual, sino su "código alterno".
+  const LISTA_CODIGOS_ALTERNOS = {
+    'DISTRIBUIDOR': 'LPD',
+    'ESPECIAL': 'LPES',
+    'PUBLICO': 'LPP',
+    'POR MAYOR': 'LPM',
+    'EXPORTACION': 'LPE'
+  };
+  function codigoAlternoLista(lista){
+    const key = String(lista||'').trim().toUpperCase();
+    return LISTA_CODIGOS_ALTERNOS[key] || lista;
+  }
+
   function buildPedidoWorkbook(nit, lista, cartData, obsGeneral){
+    const codigoLista = codigoAlternoLista(lista);
     const data = [
       ["DETALLE MOVIMIENTO","","","",""],
       ["referenciaProducto","cantidadProducto","listaPrecioProducto","valorProducto","observacionProducto"],
       ["Referencia Producto","Cantidad Producto","Código Alterno Lista Precio","Valor Producto","Observación"],
-      ...cartData.map(it=>[it.referencia, it.cantidad, lista, it.valor, it.nota||''])
+      ...cartData.map(it=>[it.referencia, it.cantidad, codigoLista, it.valor, it.nota||''])
     ];
     const ws = XLSX.utils.aoa_to_sheet(data);
     ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:4}}];
