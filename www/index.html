@@ -6,6 +6,8 @@
 <title>Toma de Pedidos</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.js"></script>
 <script src="native/capacitor.js"></script>
 <script src="native/capacitor-share.js"></script>
 <script src="native/capacitor-filesystem.js"></script>
@@ -408,7 +410,7 @@
       const res = await fetch('catalogo.json', {cache:'no-cache'});
       if(!res.ok) throw new Error('HTTP '+res.status);
       const arr = await res.json();
-      return arr.map(a=>({codigo:a[0], referencia:a[1], lista:a[2], valor:a[3], articulo:a[4], talla:a[5], descripcion:a[6]}));
+      return arr.map(a=>({codigo:a[0], referencia:a[1], lista:a[2], valor:a[3], articulo:a[4], talla:a[5], descripcion:a[6], color:a[7]||''}));
     }catch(e){
       console.error('No se pudo cargar catalogo.json', e);
       notify('No pude cargar el catálogo (catalogo.json). Revisa tu conexión y que el archivo esté junto al index.html, luego recarga la página.');
@@ -875,6 +877,166 @@
     return `pedido_${nit.replace(/[^a-zA-Z0-9-]/g,'')}_${stamp}.xlsx`;
   }
 
+  // ---------- Export to PDF (comprobante para el cliente) ----------
+  const EMPRESA_PDF = {
+    nombre: 'ILAZUL S.A.S.',
+    nit: 'NIT. 901.055.555',
+    direccion: 'TV 49 A 59 13 (P3)',
+    telefono: 'TEL. 6043227847',
+    ciudad: 'MEDELLIN - COLOMBIA'
+  };
+  const moneyPlain = n => Math.round(Number(n)||0).toLocaleString('es-CO');
+
+  function buscarInfoReferencia(ref){
+    const row = catalog.find(c=>c.referencia===ref);
+    if(!row) return {descripcion:'', talla:'', color:''};
+    return {descripcion:row.descripcion||'', talla:row.talla||'', color:row.color||''};
+  }
+
+  function buildPedidoPDF(nit, lista, cartData, obsGeneral, fecha){
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({unit:'pt', format:'letter'});
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 40;
+
+    doc.setFont('helvetica','bold'); doc.setFontSize(14);
+    doc.text('VORELA', margin, 40);
+    doc.setFontSize(11);
+    doc.text(EMPRESA_PDF.nombre, pageWidth/2, 38, {align:'center'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+    [EMPRESA_PDF.nit, EMPRESA_PDF.direccion, EMPRESA_PDF.telefono, EMPRESA_PDF.ciudad].forEach((line,i)=>{
+      doc.text(line, pageWidth/2, 50+i*10, {align:'center'});
+    });
+    doc.setFont('helvetica','bold'); doc.setFontSize(10);
+    doc.text('COPIA DE PEDIDO PARA EL CLIENTE', pageWidth-margin, 38, {align:'right'});
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
+    doc.text('FECHA DE ELABORACIÓN: ' + fecha.toLocaleDateString('es-CO'), pageWidth-margin, 52, {align:'right'});
+
+    let y = 96;
+    doc.setDrawColor(180);
+    doc.rect(margin, y, pageWidth-margin*2, 26);
+    doc.setFont('helvetica','bold'); doc.setFontSize(9);
+    doc.text('NIT/CC CLIENTE:', margin+6, y+11);
+    doc.setFont('helvetica','normal');
+    doc.text(String(nit), margin+95, y+11);
+    doc.setFont('helvetica','bold');
+    doc.text('LISTA DE PRECIOS:', margin+6, y+22);
+    doc.setFont('helvetica','normal');
+    doc.text(String(lista), margin+95, y+22);
+    y += 38;
+
+    const rows = cartData.map(it=>{
+      const info = buscarInfoReferencia(it.referencia);
+      const base = Math.round(it.valor/1.19);
+      const iva = it.valor - base;
+      const total = it.valor*it.cantidad;
+      return [it.referencia, info.descripcion, info.color, info.talla, String(it.cantidad), moneyPlain(base), moneyPlain(iva), moneyPlain(total)];
+    });
+
+    doc.autoTable({
+      startY: y,
+      margin: {left:margin, right:margin},
+      head: [['REFERENCIA','DESCRIPCION','COLOR','TALLA','CANT.','VALOR UNIT','IVA','VALOR TOTAL']],
+      body: rows,
+      styles: {fontSize:8, cellPadding:3},
+      headStyles: {fillColor:[26,26,26], textColor:255, fontStyle:'bold'},
+      columnStyles: {
+        4:{halign:'right'}, 5:{halign:'right'}, 6:{halign:'right'}, 7:{halign:'right'}
+      },
+      didDrawPage: ()=>{
+        doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor(120);
+        doc.text('Página ' + doc.internal.getNumberOfPages(), pageWidth-margin, pageHeight-20, {align:'right'});
+        doc.setTextColor(0);
+      }
+    });
+
+    let finalY = doc.lastAutoTable.finalY + 16;
+    if(finalY > pageHeight-150){ doc.addPage(); finalY = 50; }
+
+    if(obsGeneral && obsGeneral.trim()){
+      doc.setFont('helvetica','bold'); doc.setFontSize(9);
+      doc.text('OBSERVACIONES:', margin, finalY);
+      doc.setFont('helvetica','normal');
+      const obsLines = doc.splitTextToSize(obsGeneral.trim(), pageWidth-margin*2);
+      doc.text(obsLines, margin, finalY+12);
+      finalY += 12 + obsLines.length*11 + 10;
+    }
+
+    const totalUnidades = cartData.reduce((a,b)=>a+b.cantidad,0);
+    const totalBase = cartData.reduce((a,b)=>a + Math.round(b.valor/1.19)*b.cantidad, 0);
+    const totalIva = cartData.reduce((a,b)=>{ const base=Math.round(b.valor/1.19); return a+(b.valor-base)*b.cantidad; }, 0);
+    const totalGeneral = cartData.reduce((a,b)=>a+b.valor*b.cantidad,0);
+
+    const totBoxW = 200, totBoxX = pageWidth-margin-totBoxW;
+    const totLines = [['UNIDADES', String(totalUnidades)], ['BASE', moneyPlain(totalBase)], ['IMPUESTOS', moneyPlain(totalIva)], ['TOTAL', moneyPlain(totalGeneral)]];
+    if(finalY + totLines.length*14 + 60 > pageHeight-margin){ doc.addPage(); finalY = 50; }
+    doc.setFontSize(9);
+    totLines.forEach((row,i)=>{
+      const ly = finalY + i*14;
+      doc.setFont('helvetica', row[0]==='TOTAL' ? 'bold':'normal');
+      doc.text(row[0], totBoxX, ly);
+      doc.text(row[1], totBoxX+totBoxW, ly, {align:'right'});
+    });
+    finalY += totLines.length*14 + 34;
+
+    doc.setDrawColor(0);
+    doc.line(margin, finalY, margin+220, finalY);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8);
+    doc.text('FIRMA Y SELLO DE QUIEN RECIBE', margin, finalY+10);
+
+    return doc;
+  }
+
+  function nombreArchivoPedidoPDF(nit, fecha){
+    const stamp = fecha.toISOString().slice(0,16).replace('T','_').replace(':','h');
+    return `pedido_cliente_${nit.replace(/[^a-zA-Z0-9-]/g,'')}_${stamp}.pdf`;
+  }
+
+  async function compartirPDFPedido(doc, filename, obsGeneral, nit){
+    const esAppNativa = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    if(esAppNativa){
+      try{
+        const datauri = doc.output('datauristring');
+        const base64 = datauri.split(',').pop();
+        const Filesystem = window.Capacitor.Plugins.Filesystem;
+        const Share = window.Capacitor.Plugins.Share;
+        const escrito = await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+        const shareOpts = { title: 'Pedido cliente ' + nit, url: escrito.uri };
+        if(obsGeneral && obsGeneral.trim()) shareOpts.text = 'Observación general: ' + obsGeneral.trim();
+        await Share.share(shareOpts);
+        return;
+      }catch(err){
+        console.warn('Compartir nativo de PDF falló, se intenta el respaldo del navegador:', err);
+      }
+    }
+    let compartido = false;
+    let motivo = '';
+    try{
+      const blob = doc.output('blob');
+      const file = new File([blob], filename, {type:'application/pdf'});
+      const shareData = {files:[file]};
+      if(obsGeneral && obsGeneral.trim()) shareData.text = 'Observación general: ' + obsGeneral.trim();
+      if(!navigator.share){
+        motivo = 'Este navegador no tiene la función de compartir (navigator.share no existe).';
+      } else if(!navigator.canShare){
+        motivo = 'Este navegador no puede verificar si soporta compartir archivos (navigator.canShare no existe).';
+      } else if(!navigator.canShare({files:[file]})){
+        motivo = 'El navegador dice que no puede compartir este archivo (canShare devolvió falso).';
+      } else {
+        await navigator.share(shareData);
+        compartido = true;
+      }
+    }catch(err){
+      if(err && err.name === 'AbortError'){ compartido = true; }
+      else motivo = 'navigator.share falló: ' + (err && (err.name||err.message) ? (err.name||'')+' '+(err.message||'') : err);
+    }
+    if(!compartido){
+      if(motivo) console.warn('Compartir no disponible, se descargó en su lugar:', motivo);
+      doc.save(filename);
+    }
+  }
+
   // Intenta compartir directo (WhatsApp, correo, Drive, lo que tenga el celular).
   // Si el navegador no lo soporta (típico en computador), simplemente se descarga.
   async function compartirOdescargarPedido(wb, filename, nit, lista, obsGeneral){
@@ -1028,22 +1190,36 @@
       <div class="hist-item">
         <div class="row1"><span>NIT ${escapeHtml(h.nit)}</span><span>${money(h.total)}</span></div>
         <div class="row2"><span>${new Date(h.fecha).toLocaleString('es-CO',{dateStyle:'medium',timeStyle:'short'})}</span><span>${h.items} ítems · ${escapeHtml(h.lista)}</span></div>
-        <button class="btn btn-outline btn-sm" style="width:100%;margin-top:9px;" data-hist-share="${i}">Compartir</button>
+        <div class="field-row" style="margin-top:9px;">
+          <button class="btn btn-outline btn-sm" style="width:100%;" data-hist-share-excel="${i}">Excel (Saya)</button>
+          <button class="btn btn-outline btn-sm" style="width:100%;" data-hist-share-pdf="${i}">PDF (cliente)</button>
+        </div>
       </div>
     `).join('');
   }
 
   document.getElementById('hist-list').addEventListener('click', async (e)=>{
-    const btn = e.target.closest('button[data-hist-share]');
+    const btnExcel = e.target.closest('button[data-hist-share-excel]');
+    const btnPdf = e.target.closest('button[data-hist-share-pdf]');
+    const btn = btnExcel || btnPdf;
     if(!btn) return;
-    const record = historial[Number(btn.dataset.histShare)];
+    const idx = Number(btnExcel ? btn.dataset.histShareExcel : btn.dataset.histSharePdf);
+    const record = historial[idx];
     if(!record){ notify('No encontré los datos de ese pedido.'); return; }
     if(!record.cart || !record.cart.length){ notify('Este pedido es de una versión anterior y no guardó los productos, así que no se puede volver a compartir.'); return; }
     const original = btn.textContent;
     btn.textContent = 'Preparando…';
     try{
-      const wb = buildPedidoWorkbook(record.nit, record.lista, record.cart, record.obsGeneral);
-      await compartirOdescargarPedido(wb, record.filename, record.nit, record.lista, record.obsGeneral);
+      if(btnExcel){
+        const wb = buildPedidoWorkbook(record.nit, record.lista, record.cart, record.obsGeneral);
+        await compartirOdescargarPedido(wb, record.filename, record.nit, record.lista, record.obsGeneral);
+      } else {
+        if(!catalog.length){ notify('El catálogo aún está cargando, intenta de nuevo en un momento.'); return; }
+        const fecha = new Date(record.fecha);
+        const doc = buildPedidoPDF(record.nit, record.lista, record.cart, record.obsGeneral, fecha);
+        const filenamePdf = nombreArchivoPedidoPDF(record.nit, fecha);
+        await compartirPDFPedido(doc, filenamePdf, record.obsGeneral, record.nit);
+      }
     } finally {
       btn.textContent = original;
     }
