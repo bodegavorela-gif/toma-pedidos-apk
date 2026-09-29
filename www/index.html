@@ -427,6 +427,7 @@
 
   // ---------- State ----------
   let catalog = [];          // [{codigo, referencia, lista, valor}]
+  let fotosDrive = {};       // {codigo: driveFileId}
   let cart = [];              // [{referencia, cantidad, valor}]
   let pendientes = [];        // [{descripcion, color, cantidad}] — no va al Excel
   let selectedLista = "";
@@ -889,8 +890,8 @@
 
   function buscarInfoReferencia(ref){
     const row = catalog.find(c=>c.referencia===ref);
-    if(!row) return {descripcion:'', talla:'', color:''};
-    return {descripcion:row.descripcion||'', talla:row.talla||'', color:row.color||''};
+    if(!row) return {descripcion:'', talla:'', color:'', articulo:ref};
+    return {descripcion:row.descripcion||'', talla:row.talla||'', color:row.color||'', articulo:row.articulo||ref};
   }
 
   function buildPedidoPDF(nit, lista, cartData, obsGeneral, fecha){
@@ -931,7 +932,7 @@
       const base = Math.round(it.valor/1.19);
       const iva = it.valor - base;
       const total = it.valor*it.cantidad;
-      return [it.referencia, info.descripcion, info.color, info.talla, String(it.cantidad), moneyPlain(base), moneyPlain(iva), moneyPlain(total)];
+      return [info.articulo, info.descripcion, info.color, info.talla, String(it.cantidad), moneyPlain(base), moneyPlain(iva), moneyPlain(total)];
     });
 
     doc.autoTable({
@@ -1152,13 +1153,14 @@
     el.innerHTML = keys.map(k=>{
       const g = grupos[k];
       const precios = Object.keys(g.precios).map(l=>`<span>${escapeHtml(l)}: <b>${money(g.precios[l])}</b></span>`).join('');
-      const imgUrlJpg = 'fotos/' + encodeURIComponent(g.articulo) + '.jpg';
-      const imgUrlPng = 'fotos/' + encodeURIComponent(g.articulo) + '.png';
+      const fileId = fotosDrive[g.articulo];
+      const imgTag = fileId
+        ? `<img src="https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w400" alt="${escapeAttr(g.articulo)}" loading="lazy" onerror="this.style.display='none';this.parentElement.classList.add('no-foto')">`
+        : '';
       return `
         <div class="foto-card">
-          <div class="foto-img">
-            <img src="${imgUrlJpg}" alt="${escapeAttr(g.articulo)}" loading="lazy" data-png="${escapeAttr(imgUrlPng)}" data-tried-png="0"
-                 onerror="if(this.dataset.triedPng==='0'){this.dataset.triedPng='1';this.src=this.dataset.png;}else{this.style.display='none';this.parentElement.classList.add('no-foto');}">
+          <div class="foto-img${fileId?'':' no-foto'}">
+            ${imgTag}
           </div>
           <div class="foto-info">
             <div class="foto-codigo">${escapeHtml(g.articulo)}</div>
@@ -1493,6 +1495,10 @@
         renderPendientes();
       }
       updateExportState();
+      try{
+        const res = await fetch('fotos_drive.json', {cache:'no-cache'});
+        if(res.ok) fotosDrive = await res.json();
+      }catch(e){ console.warn('No se pudo cargar fotos_drive.json', e); }
     }catch(err){
       notify('No pude iniciar la app: ' + (err && err.message ? err.message : err));
     }
