@@ -357,6 +357,22 @@
 
     <!-- HISTORIAL -->
     <section class="view" id="view-historial">
+      <div class="card">
+        <h2>Buscar en historial</h2>
+        <label for="hist-buscar">NIT o nombre del cliente</label>
+        <input type="text" id="hist-buscar" placeholder="Ej: 900123456 o María…" autocomplete="off">
+        <div class="field-row">
+          <div>
+            <label for="hist-fecha-desde">Desde</label>
+            <input type="date" id="hist-fecha-desde">
+          </div>
+          <div>
+            <label for="hist-fecha-hasta">Hasta</label>
+            <input type="date" id="hist-fecha-hasta">
+          </div>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-hist-limpiar-filtros" style="width:100%;">Limpiar filtros</button>
+      </div>
       <div id="hist-list">
         <div class="muted" style="padding:8px 2px;">Aquí quedan guardados los pedidos que generes en este celular.</div>
       </div>
@@ -1284,10 +1300,19 @@
     const spinner = document.getElementById('foto-lightbox-spinner');
     document.getElementById('foto-lightbox-caption').textContent = codigo || '';
     img.style.display = 'none';
+    spinner.textContent = 'Cargando…';
     spinner.style.display = '';
+    // Algunos archivos de Drive fallan en tamaños grandes; si w1600 falla, se intenta más pequeño antes de rendirse.
+    const tamanos = ['w1600', 'w1000', 'w400'];
+    let intento = 0;
+    function intentarCarga(){
+      if(intento >= tamanos.length){ spinner.textContent = 'No se pudo cargar la foto.'; return; }
+      img.src = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(fileId) + '&sz=' + tamanos[intento];
+      intento++;
+    }
     img.onload = ()=>{ spinner.style.display = 'none'; img.style.display = ''; };
-    img.onerror = ()=>{ spinner.textContent = 'No se pudo cargar la foto.'; };
-    img.src = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(fileId) + '&sz=w1600';
+    img.onerror = ()=>{ img.style.display = 'none'; spinner.style.display = ''; intentarCarga(); };
+    intentarCarga();
     overlay.classList.add('show');
   }
   function cerrarFotoLightbox(){
@@ -1311,7 +1336,26 @@
       el.innerHTML = '<div class="muted" style="padding:8px 2px;">Aquí quedan guardados los pedidos que generes en este celular.</div>';
       return;
     }
-    el.innerHTML = historial.map((h,i)=>`
+    const texto = (document.getElementById('hist-buscar').value||'').trim().toLowerCase();
+    const desdeVal = document.getElementById('hist-fecha-desde').value;
+    const hastaVal = document.getElementById('hist-fecha-hasta').value;
+    const desde = desdeVal ? new Date(desdeVal + 'T00:00:00') : null;
+    const hasta = hastaVal ? new Date(hastaVal + 'T23:59:59') : null;
+
+    const conIndice = historial.map((h,i)=>({h, i})).filter(({h})=>{
+      if(texto && !(h.nit||'').toLowerCase().includes(texto)) return false;
+      const f = new Date(h.fecha);
+      if(desde && f < desde) return false;
+      if(hasta && f > hasta) return false;
+      return true;
+    });
+
+    if(!conIndice.length){
+      el.innerHTML = '<div class="muted" style="padding:8px 2px;">No hay pedidos que coincidan con ese filtro.</div>';
+      return;
+    }
+
+    el.innerHTML = conIndice.map(({h,i})=>`
       <div class="hist-item">
         <div class="row1"><span>NIT ${escapeHtml(h.nit)}</span><span>${money(h.total)}</span></div>
         <div class="row2"><span>${new Date(h.fecha).toLocaleString('es-CO',{dateStyle:'medium',timeStyle:'short'})}</span><span>${h.items} ítems · ${escapeHtml(h.lista)}</span></div>
@@ -1325,6 +1369,20 @@
       </div>
     `).join('');
   }
+
+  let histFilterTimer = null;
+  document.getElementById('hist-buscar').addEventListener('input', ()=>{
+    clearTimeout(histFilterTimer);
+    histFilterTimer = setTimeout(renderHistory, 200);
+  });
+  document.getElementById('hist-fecha-desde').addEventListener('change', renderHistory);
+  document.getElementById('hist-fecha-hasta').addEventListener('change', renderHistory);
+  document.getElementById('btn-hist-limpiar-filtros').addEventListener('click', ()=>{
+    document.getElementById('hist-buscar').value = '';
+    document.getElementById('hist-fecha-desde').value = '';
+    document.getElementById('hist-fecha-hasta').value = '';
+    renderHistory();
+  });
 
   function cargarPedidoParaEditar(idx){
     const record = historial[idx];
