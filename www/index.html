@@ -239,6 +239,11 @@
 
     <!-- PEDIDO -->
     <section class="view active" id="view-pedido">
+      <div class="card" id="edit-banner" style="display:none;border-color:var(--warn);background:#FFF6EC;">
+        <div style="font-weight:700;font-size:13px;color:var(--warn);">✏️ Editando pedido guardado</div>
+        <div class="muted" id="edit-banner-text" style="margin:4px 0 10px;"></div>
+        <button class="btn btn-ghost btn-sm" id="btn-edit-cancel" style="width:100%;">Cancelar edición</button>
+      </div>
       <div class="card">
         <h2>Datos del pedido</h2>
         <label for="in-nit">NIT del cliente</label>
@@ -456,6 +461,7 @@
   let cart = [];              // [{referencia, cantidad, valor}]
   let pendientes = [];        // [{descripcion, color, cantidad}] — no va al Excel
   let selectedLista = "";
+  let editingHistIndex = null; // índice en historial que se está editando (null = pedido nuevo)
   let html5Qrcode = null;
   let sessionScanCount = 0;
   let saveTimer = null;
@@ -1165,12 +1171,20 @@
       cart: cart.map(it=>({referencia:it.referencia, cantidad:it.cantidad, valor:it.valor, nota:it.nota||''})),
       obsGeneral
     };
-    historial.unshift(record);
-    historial = historial.slice(0,100);
+    const estabaEditando = editingHistIndex !== null;
+    if(estabaEditando && historial[editingHistIndex]){
+      historial[editingHistIndex] = record;
+    } else {
+      historial.unshift(record);
+      historial = historial.slice(0,100);
+    }
     lsSet('tp_historial', historial);
     renderHistory();
 
-    if(confirm('Pedido generado. ¿Vaciar el pedido para empezar uno nuevo?')){
+    const seguir = estabaEditando
+      ? confirm('Pedido actualizado en el historial. ¿Vaciar el pedido para empezar uno nuevo?')
+      : confirm('Pedido generado. ¿Vaciar el pedido para empezar uno nuevo?');
+    if(seguir){
       cart = [];
       pendientes = [];
       document.getElementById('in-nit').value = '';
@@ -1179,6 +1193,8 @@
       renderPendientes();
       lsSet('tp_draft', null);
     }
+    editingHistIndex = null;
+    document.getElementById('edit-banner').style.display = 'none';
   });
 
   // ---------- History ----------
@@ -1256,11 +1272,52 @@
           <button class="btn btn-outline btn-sm" style="width:100%;" data-hist-share-excel="${i}">Excel (Saya)</button>
           <button class="btn btn-outline btn-sm" style="width:100%;" data-hist-share-pdf="${i}">PDF (cliente)</button>
         </div>
+        <div style="margin-top:6px;">
+          <button class="btn btn-ghost btn-sm" style="width:100%;" data-hist-edit="${i}">✏️ Editar este pedido</button>
+        </div>
       </div>
     `).join('');
   }
 
+  function cargarPedidoParaEditar(idx){
+    const record = historial[idx];
+    if(!record){ notify('No encontré los datos de ese pedido.'); return; }
+    if(!record.cart || !record.cart.length){ notify('Este pedido es de una versión anterior y no guardó los productos, así que no se puede editar.'); return; }
+    if(cart.length && !confirm('Tienes un pedido sin terminar en la pestaña "Pedido". ¿Reemplazarlo por el pedido que quieres editar?')) return;
+    cart = record.cart.map(it=>({referencia:it.referencia, cantidad:it.cantidad, valor:it.valor, nota:it.nota||''}));
+    pendientes = [];
+    document.getElementById('in-nit').value = record.nit || '';
+    document.getElementById('in-obs-general').value = record.obsGeneral || '';
+    selectedLista = record.lista || '';
+    document.getElementById('in-lista').value = record.lista || '';
+    editingHistIndex = idx;
+    document.getElementById('edit-banner').style.display = '';
+    document.getElementById('edit-banner-text').textContent = 'NIT ' + record.nit + ' · ' + record.lista + ' — al generar y compartir, se actualiza este mismo pedido del historial.';
+    renderCart();
+    renderPendientes();
+    updateExportState();
+    debounceSaveDraft();
+    document.querySelector('.tab-btn[data-tab="pedido"]').click();
+    notify('Cargaste el pedido de NIT ' + record.nit + ' para editarlo. Cambia lo que necesites y toca "Generar y compartir pedido".');
+  }
+
+  document.getElementById('btn-edit-cancel').addEventListener('click', ()=>{
+    if(!confirm('¿Cancelar la edición y vaciar el pedido actual?')) return;
+    editingHistIndex = null;
+    cart = [];
+    pendientes = [];
+    document.getElementById('in-nit').value = '';
+    document.getElementById('in-obs-general').value = '';
+    document.getElementById('edit-banner').style.display = 'none';
+    renderCart();
+    renderPendientes();
+    updateExportState();
+    lsSet('tp_draft', null);
+  });
+
   document.getElementById('hist-list').addEventListener('click', async (e)=>{
+    const btnEdit = e.target.closest('button[data-hist-edit]');
+    if(btnEdit){ cargarPedidoParaEditar(Number(btnEdit.dataset.histEdit)); return; }
     const btnExcel = e.target.closest('button[data-hist-share-excel]');
     const btnPdf = e.target.closest('button[data-hist-share-pdf]');
     const btn = btnExcel || btnPdf;
