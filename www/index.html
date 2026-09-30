@@ -170,6 +170,19 @@
     background:#fff;border-radius:16px 16px 0 0;padding:20px 18px calc(20px + env(safe-area-inset-bottom));
     width:100%;max-width:520px;max-height:80vh;overflow-y:auto;
   }
+  .foto-img img{cursor:zoom-in;}
+  #foto-lightbox-overlay{
+    position:fixed;inset:0;background:rgba(0,0,0,.88);z-index:140;display:none;
+    align-items:center;justify-content:center;flex-direction:column;padding:20px;
+  }
+  #foto-lightbox-overlay.show{display:flex;}
+  #foto-lightbox-overlay img{max-width:100%;max-height:78vh;border-radius:8px;background:#fff;object-fit:contain;}
+  #foto-lightbox-overlay .foto-lightbox-caption{color:#fff;font-family:var(--mono);font-size:13px;margin-top:12px;text-align:center;}
+  #foto-lightbox-overlay .foto-lightbox-close{
+    position:absolute;top:16px;right:16px;background:rgba(255,255,255,.15);border:none;color:#fff;
+    width:38px;height:38px;border-radius:50%;font-size:18px;line-height:1;
+  }
+  #foto-lightbox-overlay .foto-lightbox-spinner{color:#fff;font-family:var(--mono);font-size:12px;}
   #scan-processing div:last-child{font-family:var(--mono);font-size:13px;letter-spacing:.04em;}
   .spinner{
     width:38px;height:38px;border-radius:50%;border:3px solid rgba(255,255,255,.25);
@@ -406,6 +419,14 @@
       <button class="btn btn-primary" id="btn-vendedor-continuar">Generar PDF</button>
     </div>
   </div>
+</div>
+
+<!-- Vista previa ampliada de la foto de un artículo -->
+<div id="foto-lightbox-overlay">
+  <button class="foto-lightbox-close" id="btn-foto-lightbox-close">✕</button>
+  <div class="foto-lightbox-spinner" id="foto-lightbox-spinner">Cargando…</div>
+  <img id="foto-lightbox-img" alt="">
+  <div class="foto-lightbox-caption" id="foto-lightbox-caption"></div>
 </div>
 
 <script>
@@ -1231,7 +1252,7 @@
       const precios = Object.keys(g.precios).map(l=>`<span>${escapeHtml(l)}: <b>${money(g.precios[l])}</b></span>`).join('');
       const fileId = fotosDrive[g.articulo];
       const imgTag = fileId
-        ? `<img src="https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w400" alt="${escapeAttr(g.articulo)}" loading="lazy" onerror="this.style.display='none';this.parentElement.classList.add('no-foto')">`
+        ? `<img src="https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w400" alt="${escapeAttr(g.articulo)}" loading="lazy" data-foto-zoom="${escapeAttr(fileId)}" data-foto-zoom-cod="${escapeAttr(g.articulo)}" onerror="this.style.display='none';this.parentElement.classList.add('no-foto')">`
         : '';
       return `
         <div class="foto-card">
@@ -1256,6 +1277,34 @@
     clearTimeout(fotosSearchTimer);
     const val = e.target.value;
     fotosSearchTimer = setTimeout(()=>buscarFotos(val), 200);
+  });
+
+  // ---------- Vista previa ampliada de fotos ----------
+  function abrirFotoLightbox(fileId, codigo){
+    const overlay = document.getElementById('foto-lightbox-overlay');
+    const img = document.getElementById('foto-lightbox-img');
+    const spinner = document.getElementById('foto-lightbox-spinner');
+    document.getElementById('foto-lightbox-caption').textContent = codigo || '';
+    img.style.display = 'none';
+    spinner.style.display = '';
+    img.onload = ()=>{ spinner.style.display = 'none'; img.style.display = ''; };
+    img.onerror = ()=>{ spinner.textContent = 'No se pudo cargar la foto.'; };
+    img.src = 'https://drive.google.com/thumbnail?id=' + encodeURIComponent(fileId) + '&sz=w1600';
+    overlay.classList.add('show');
+  }
+  function cerrarFotoLightbox(){
+    const overlay = document.getElementById('foto-lightbox-overlay');
+    overlay.classList.remove('show');
+    document.getElementById('foto-lightbox-img').src = '';
+  }
+  document.getElementById('fotos-resultados').addEventListener('click', (e)=>{
+    const img = e.target.closest('img[data-foto-zoom]');
+    if(!img) return;
+    abrirFotoLightbox(img.dataset.fotoZoom, img.dataset.fotoZoomCod);
+  });
+  document.getElementById('btn-foto-lightbox-close').addEventListener('click', cerrarFotoLightbox);
+  document.getElementById('foto-lightbox-overlay').addEventListener('click', (e)=>{
+    if(e.target.id === 'foto-lightbox-overlay') cerrarFotoLightbox();
   });
 
   function renderHistory(){
