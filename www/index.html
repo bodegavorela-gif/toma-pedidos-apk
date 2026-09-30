@@ -963,10 +963,8 @@
     });
     doc.setFont('helvetica','bold'); doc.setFontSize(10);
     doc.text('COPIA DE PEDIDO PARA EL CLIENTE', pageWidth-margin, 38, {align:'right'});
-    doc.setFont('helvetica','normal'); doc.setFontSize(8.5);
-    doc.text('FECHA DE ELABORACIÓN: ' + fecha.toLocaleDateString('es-CO'), pageWidth-margin, 52, {align:'right'});
 
-    const infoLines = [['NIT/CC CLIENTE:', String(nit)], ['LISTA DE PRECIOS:', String(lista)]];
+    const infoLines = [['NIT/CC CLIENTE:', String(nit)]];
     if(vendedor && vendedor.nombre && vendedor.nombre.trim()) infoLines.push(['VENDEDOR:', vendedor.nombre.trim()]);
     if(vendedor && vendedor.contacto && vendedor.contacto.trim()) infoLines.push(['CONTACTO VENDEDOR:', vendedor.contacto.trim()]);
 
