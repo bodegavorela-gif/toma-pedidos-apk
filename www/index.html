@@ -412,6 +412,9 @@
   <div id="surtido-panel">
     <h2 id="surtido-title">Referencia</h2>
     <div class="muted" id="surtido-sub" style="margin-bottom:12px;"></div>
+    <label for="surtido-color" style="margin-bottom:5px;">Color de esta tanda (opcional)</label>
+    <input type="text" id="surtido-color" placeholder="Ej: Azul, Rosado, Negro…" autocomplete="off" style="margin-bottom:4px;">
+    <div class="muted" id="surtido-colores-agregados" style="margin-bottom:10px;display:none;"></div>
     <div class="field-row" style="align-items:flex-end;margin-bottom:14px;padding-bottom:14px;border-bottom:1px dashed var(--line);">
       <div style="flex:1;">
         <label for="surtido-total" style="margin-bottom:5px;">Cantidad total (repartir pareja)</label>
@@ -422,8 +425,9 @@
     <div id="surtido-rows"></div>
     <div class="btn-row" style="margin-top:14px;">
       <button class="btn btn-ghost" id="btn-surtido-cancel">Cancelar</button>
-      <button class="btn btn-primary" id="btn-surtido-add">Agregar surtido</button>
+      <button class="btn btn-outline" id="btn-surtido-add-otro">+ Otro color</button>
     </div>
+    <button class="btn btn-primary" id="btn-surtido-add" style="width:100%;margin-top:10px;">Agregar surtido y cerrar</button>
   </div>
 </div>
 
@@ -1661,8 +1665,19 @@
       </div>
     `).join('');
     document.getElementById('surtido-total').value = '';
+    document.getElementById('surtido-color').value = '';
+    surtidoColoresAgregados = [];
+    renderSurtidoColoresAgregados();
     document.getElementById('surtido-panel').dataset.articulo = articulo;
     document.getElementById('surtido-overlay').classList.add('show');
+  }
+
+  let surtidoColoresAgregados = [];
+  function renderSurtidoColoresAgregados(){
+    const el = document.getElementById('surtido-colores-agregados');
+    if(!surtidoColoresAgregados.length){ el.style.display = 'none'; return; }
+    el.style.display = '';
+    el.innerHTML = '✓ Ya agregado en: <b>' + surtidoColoresAgregados.map(escapeHtml).join(', ') + '</b>';
   }
 
   document.getElementById('btn-surtido-distribuir').addEventListener('click', ()=>{
@@ -1682,25 +1697,44 @@
     document.getElementById('surtido-overlay').classList.remove('show');
   });
 
-  document.getElementById('btn-surtido-add').addEventListener('click', ()=>{
+  // Agrega al carrito las cantidades llenadas (una tanda = un color). Devuelve cuántas líneas agregó.
+  function agregarRondaSurtido(){
     const articulo = document.getElementById('surtido-panel').dataset.articulo;
     const rows = catalog.filter(c=>c.articulo===articulo && c.lista===selectedLista);
     const porTalla = agruparPorTallaSurtido(rows);
+    const color = document.getElementById('surtido-color').value.trim();
     let added = 0;
     document.querySelectorAll('#surtido-rows input[data-talla]').forEach(input=>{
       const cant = Math.max(0, Number(input.value)||0);
       if(cant<=0) return;
       const row = porTalla[input.dataset.talla];
       if(!row) return;
-      cart.push({referencia:row.referencia, cantidad:cant, valor:row.valor, nota:''});
+      cart.push({referencia:row.referencia, cantidad:cant, valor:row.valor, nota:color});
       added++;
     });
-    document.getElementById('surtido-overlay').classList.remove('show');
     if(added){
+      if(color && !surtidoColoresAgregados.includes(color)) surtidoColoresAgregados.push(color);
       renderCart();
       debounceSaveDraft();
-      showToast('ok', 'Surtido agregado', added + (added===1?' talla':' tallas'));
+      showToast('ok', 'Surtido agregado', added + (added===1?' talla':' tallas') + (color?' · '+color:''));
     }
+    return added;
+  }
+
+  document.getElementById('btn-surtido-add').addEventListener('click', ()=>{
+    agregarRondaSurtido();
+    document.getElementById('surtido-overlay').classList.remove('show');
+  });
+
+  document.getElementById('btn-surtido-add-otro').addEventListener('click', ()=>{
+    const added = agregarRondaSurtido();
+    if(!added){ notify('Llena al menos una cantidad por talla antes de agregar otro color.'); return; }
+    // Deja el panel abierto, listo para la siguiente tanda de color.
+    document.querySelectorAll('#surtido-rows input[data-talla]').forEach(input=>{ input.value = ''; });
+    document.getElementById('surtido-total').value = '';
+    document.getElementById('surtido-color').value = '';
+    renderSurtidoColoresAgregados();
+    document.getElementById('surtido-color').focus();
   });
 
   function showToast(type, title, sub){
