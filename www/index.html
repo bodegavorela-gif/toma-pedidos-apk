@@ -357,21 +357,27 @@
 
     <!-- HISTORIAL -->
     <section class="view" id="view-historial">
-      <div class="card">
-        <h2>Buscar en historial</h2>
-        <label for="hist-buscar">NIT o nombre del cliente</label>
-        <input type="text" id="hist-buscar" placeholder="Ej: 900123456 o María…" autocomplete="off">
-        <div class="field-row">
-          <div>
-            <label for="hist-fecha-desde">Desde</label>
-            <input type="date" id="hist-fecha-desde">
-          </div>
-          <div>
-            <label for="hist-fecha-hasta">Hasta</label>
-            <input type="date" id="hist-fecha-hasta">
-          </div>
+      <div class="card" style="padding:10px 14px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;">
+          <h2 style="margin:0;">Historial</h2>
+          <button id="btn-hist-toggle-filtros" aria-label="Buscar / filtrar" title="Buscar / filtrar"
+            style="width:40px;height:40px;flex-shrink:0;border-radius:50%;border:1px solid var(--line);background:var(--paper-2);font-size:17px;line-height:1;">🔍</button>
         </div>
-        <button class="btn btn-ghost btn-sm" id="btn-hist-limpiar-filtros" style="width:100%;">Limpiar filtros</button>
+        <div id="hist-filtros-body" style="display:none;margin-top:14px;">
+          <label for="hist-buscar">NIT o nombre del cliente</label>
+          <input type="text" id="hist-buscar" placeholder="Ej: 900123456 o María…" autocomplete="off">
+          <div class="field-row">
+            <div>
+              <label for="hist-fecha-desde">Desde</label>
+              <input type="date" id="hist-fecha-desde">
+            </div>
+            <div>
+              <label for="hist-fecha-hasta">Hasta</label>
+              <input type="date" id="hist-fecha-hasta">
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-sm" id="btn-hist-limpiar-filtros" style="width:100%;">Limpiar filtros</button>
+        </div>
       </div>
       <div id="hist-list">
         <div class="muted" style="padding:8px 2px;">Aquí quedan guardados los pedidos que generes en este celular.</div>
@@ -1382,6 +1388,13 @@
     document.getElementById('hist-fecha-desde').value = '';
     document.getElementById('hist-fecha-hasta').value = '';
     renderHistory();
+  });
+
+  document.getElementById('btn-hist-toggle-filtros').addEventListener('click', ()=>{
+    const body = document.getElementById('hist-filtros-body');
+    const abierto = body.style.display !== 'none';
+    body.style.display = abierto ? 'none' : '';
+    document.getElementById('btn-hist-toggle-filtros').textContent = abierto ? '🔍' : '✕';
   });
 
   function cargarPedidoParaEditar(idx){
