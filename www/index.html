@@ -926,11 +926,28 @@
 
   function buildPedidoWorkbook(nit, lista, cartData, obsGeneral){
     const codigoLista = codigoAlternoLista(lista);
+    // Saya rechaza el archivo si una misma referencia aparece en más de una fila
+    // (pasa, por ejemplo, cuando el mismo surtido se pidió en varios colores:
+    // la referencia/talla es la misma, solo cambia el color). Se agrupan por
+    // referencia sumando las cantidades, y el detalle de color/nota de cada
+    // tanda queda unido en la observación de esa única fila.
+    const agrupado = [];
+    const indice = new Map();
+    cartData.forEach(it=>{
+      let g = indice.get(it.referencia);
+      if(!g){
+        g = {referencia: it.referencia, cantidad: 0, valor: it.valor, notas: []};
+        indice.set(it.referencia, g);
+        agrupado.push(g);
+      }
+      g.cantidad += it.cantidad;
+      if(it.nota && it.nota.trim()) g.notas.push(it.nota.trim() + ' (' + it.cantidad + ')');
+    });
     const data = [
       ["DETALLE MOVIMIENTO","","","",""],
       ["referenciaProducto","cantidadProducto","listaPrecioProducto","valorProducto","observacionProducto"],
       ["Referencia Producto","Cantidad Producto","Código Alterno Lista Precio","Valor Producto","Observación"],
-      ...cartData.map(it=>[it.referencia, it.cantidad, codigoLista, it.valor, it.nota||''])
+      ...agrupado.map(it=>[it.referencia, it.cantidad, codigoLista, it.valor, it.notas.join(' / ')])
     ];
     const ws = XLSX.utils.aoa_to_sheet(data);
     ws['!merges'] = [{s:{r:0,c:0}, e:{r:0,c:4}}];
@@ -1276,7 +1293,7 @@
       const precios = Object.keys(g.precios).map(l=>`<span>${escapeHtml(l)}: <b>${money(g.precios[l])}</b></span>`).join('');
       const fileId = fotosDrive[g.articulo];
       const imgTag = fileId
-        ? `<img src="https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w400" alt="${escapeAttr(g.articulo)}" loading="lazy" data-foto-zoom="${escapeAttr(fileId)}" data-foto-zoom-cod="${escapeAttr(g.articulo)}" onerror="this.style.display='none';this.parentElement.classList.add('no-foto')">`
+        ? `<img src="https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w400" alt="${escapeAttr(g.articulo)}" loading="lazy" data-foto-zoom="${escapeAttr(fileId)}" data-foto-zoom-cod="${escapeAttr(g.articulo)}">`
         : '';
       return `
         <div class="foto-card">
@@ -1293,6 +1310,22 @@
     }).join('');
     if(keys.length===30){
       el.innerHTML += '<div class="muted" style="padding:6px 2px;">Mostrando los primeros 30 resultados — afina la búsqueda para ver menos.</div>';
+    }
+    // Las miniaturas de Drive a veces fallan de forma pasajera (red/Drive) — se reintentan solas antes de darse por vencidas.
+    el.querySelectorAll('.foto-img img[data-foto-zoom]').forEach(img=>{
+      img.onerror = ()=>reintentarFotoThumb(img);
+    });
+  }
+
+  function reintentarFotoThumb(img){
+    const intentos = (Number(img.dataset.intentos)||0) + 1;
+    img.dataset.intentos = String(intentos);
+    if(intentos <= 3){
+      const base = img.src.split('&_r=')[0];
+      setTimeout(()=>{ img.src = base + '&_r=' + Date.now(); }, intentos*500);
+    } else {
+      img.style.display = 'none';
+      img.parentElement.classList.add('no-foto');
     }
   }
 
