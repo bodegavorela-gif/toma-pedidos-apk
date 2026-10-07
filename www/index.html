@@ -271,7 +271,7 @@
         <summary>Agregar referencia manualmente</summary>
         <div class="card" style="margin-top:8px;">
           <label for="man-ref">Referencia</label>
-          <input type="text" id="man-ref" placeholder="Ej: VOR-0234" list="dl-refs">
+          <input type="text" id="man-ref" placeholder="Ej: 1003 (surtido) o 1003SURL" list="dl-refs">
           <datalist id="dl-refs"></datalist>
           <div class="field-row">
             <div>
@@ -821,10 +821,24 @@
   });
 
   document.getElementById('btn-man-add').addEventListener('click', ()=>{
-    const ref = document.getElementById('man-ref').value.trim();
+    let ref = document.getElementById('man-ref').value.trim();
     const cant = Math.max(1, Number(document.getElementById('man-cant').value)||1);
-    const valor = Number(document.getElementById('man-valor').value)||0;
+    let valor = Number(document.getElementById('man-valor').value)||0;
     if(!ref){ notify('Escribe una referencia.'); return; }
+    // Igual que al escanear: si es una referencia base (surtido), abre el panel de tallas.
+    const exacta = catalog.find(c=>c.referencia.toUpperCase()===ref.toUpperCase() && c.lista===selectedLista);
+    if(!exacta){
+      const surtidoRows = selectedLista ? buscarFilasSurtido(ref) : [];
+      if(surtidoRows.length){
+        document.getElementById('man-ref').value='';
+        openSurtidoPanel(ref, surtidoRows);
+        return;
+      }
+      if(!selectedLista && catalog.some(c=>c.articulo===ref || c.referencia.toUpperCase()===ref.toUpperCase())){
+        notify('Primero selecciona la lista de precios.'); return;
+      }
+    }
+    if(exacta){ ref = exacta.referencia; if(!valor) valor = exacta.valor; }
     let row = cart.find(it=>it.referencia===ref && it.valor===valor && !it.nota);
     if(row) row.cantidad += cant;
     else cart.push({referencia:ref, cantidad:cant, valor, nota:''});
@@ -834,6 +848,8 @@
     document.getElementById('man-cant').value=1;
     document.getElementById('man-valor').value='';
   });
+
+  document.getElementById('man-ref').addEventListener('keydown', (e)=>{ if(e.key==='Enter'){ e.preventDefault(); document.getElementById('btn-man-add').click(); } });
 
   document.getElementById('btn-pend-add').addEventListener('click', ()=>{
     const desc = document.getElementById('pend-desc').value.trim();
@@ -1635,6 +1651,18 @@
     }
   });
 
+  // Filas del catálogo (lista actual) de un artículo base, para abrir el panel de surtido.
+  // Ignora ceros a la izquierda (EAN-13 rellenado).
+  function buscarFilasSurtido(code){
+    const codeNum = /^\d+$/.test(code) ? code.replace(/^0+/, '') : code;
+    return catalog.filter(c=>{
+      if(!c.articulo || c.lista!==selectedLista) return false;
+      if(c.articulo === code) return true;
+      const articuloNum = /^\d+$/.test(c.articulo) ? c.articulo.replace(/^0+/, '') : c.articulo;
+      return articuloNum === codeNum && codeNum !== '';
+    });
+  }
+
   function handleScannedCode(code){
     const matchLista = catalog.find(c=>c.codigo===code && c.lista===selectedLista);
     if(matchLista){
@@ -1650,13 +1678,7 @@
     // ¿Es un código de referencia base (surtido)? Trae todas las tallas de ese artículo.
     // Ignora ceros extra a la izquierda: un EAN-13 generado para un código corto
     // (ej. "1510960") suele rellenarse con ceros para completar 13 dígitos.
-    const codeNum = /^\d+$/.test(code) ? code.replace(/^0+/, '') : code;
-    const surtidoRows = catalog.filter(c=>{
-      if(!c.articulo || c.lista!==selectedLista) return false;
-      if(c.articulo === code) return true;
-      const articuloNum = /^\d+$/.test(c.articulo) ? c.articulo.replace(/^0+/, '') : c.articulo;
-      return articuloNum === codeNum && codeNum !== '';
-    });
+    const surtidoRows = buscarFilasSurtido(code);
     if(surtidoRows.length){
       openSurtidoPanel(code, surtidoRows);
       return true;
