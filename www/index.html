@@ -1030,7 +1030,9 @@
       const base = Math.round(it.valor/1.19);
       const iva = it.valor - base;
       const total = it.valor*it.cantidad;
-      return [info.articulo, info.descripcion, info.color, info.talla, String(it.cantidad), moneyPlain(base), moneyPlain(iva), moneyPlain(total)];
+      // Si el vendedor escribió un color en la línea, ese es el que pidió el cliente; si no, el del catálogo.
+      const color = (it.nota && it.nota.trim()) ? it.nota.trim() : info.color;
+      return [info.articulo, info.descripcion, color, info.talla, String(it.cantidad), moneyPlain(base), moneyPlain(iva), moneyPlain(total)];
     });
 
     doc.autoTable({
@@ -1224,8 +1226,10 @@
     const now = new Date();
     const filename = nombreArchivoPedido(nit, now);
     const wb = buildPedidoWorkbook(nit, selectedLista, cart, obsGeneral);
-    await compartirOdescargarPedido(wb, filename, nit, selectedLista, obsGeneral);
 
+    // El pedido se guarda en el historial ANTES de compartir. En el celular, al abrir el
+    // menú de compartir (WhatsApp, correo…) la app pasa a segundo plano y Android puede
+    // cerrarla; si el guardado esperara hasta después, ese pedido nunca llegaría al historial.
     const total = cart.reduce((a,b)=>a+b.cantidad*b.valor,0);
     const record = {
       nit, lista:selectedLista, fecha: now.toISOString(),
@@ -1242,6 +1246,13 @@
     }
     lsSet('tp_historial', historial);
     renderHistory();
+
+    try{
+      await compartirOdescargarPedido(wb, filename, nit, selectedLista, obsGeneral);
+    }catch(err){
+      console.warn('Error al compartir el pedido:', err);
+      notify('No se pudo abrir el menú de compartir, pero el pedido quedó guardado en el Historial.');
+    }
 
     const seguir = estabaEditando
       ? confirm('Pedido actualizado en el historial. ¿Vaciar el pedido para empezar uno nuevo?')
