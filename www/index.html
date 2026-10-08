@@ -271,7 +271,7 @@
         <summary>Agregar referencia manualmente</summary>
         <div class="card" style="margin-top:8px;">
           <label for="man-ref">Referencia</label>
-          <input type="text" id="man-ref" placeholder="Ej: 1003 (surtido) o 1003SURL" list="dl-refs">
+          <input type="text" id="man-ref" enterkeyhint="go" autocapitalize="characters" placeholder="Ej: 1003 (surtido) o 1003SURL" list="dl-refs">
           <datalist id="dl-refs"></datalist>
           <div class="field-row">
             <div>
@@ -820,20 +820,33 @@
     }
   });
 
+  let manSurtidoTs = 0;
+  // Si el texto es una referencia base (surtido) de la lista elegida, abre el panel de tallas.
+  function abrirSurtidoManual(ref){
+    ref = (ref||'').trim();
+    if(!ref || !selectedLista) return false;
+    const exacta = catalog.find(c=>c.referencia.toUpperCase()===ref.toUpperCase() && c.lista===selectedLista);
+    if(exacta) return false;
+    const rows = buscarFilasSurtido(ref);
+    if(!rows.length) return false;
+    manSurtidoTs = Date.now();
+    document.getElementById('man-ref').value = '';
+    document.getElementById('man-ref').blur();
+    openSurtidoPanel(ref, rows);
+    return true;
+  }
+  // Al salir del campo (flecha "siguiente" del teclado, Enter o tocar otro lado) abre el panel solo.
+  document.getElementById('man-ref').addEventListener('change', (e)=>{ abrirSurtidoManual(e.target.value); });
+
   document.getElementById('btn-man-add').addEventListener('click', ()=>{
     let ref = document.getElementById('man-ref').value.trim();
     const cant = Math.max(1, Number(document.getElementById('man-cant').value)||1);
     let valor = Number(document.getElementById('man-valor').value)||0;
-    if(!ref){ notify('Escribe una referencia.'); return; }
+    if(!ref){ if(Date.now()-manSurtidoTs>1500) notify('Escribe una referencia.'); return; }
     // Igual que al escanear: si es una referencia base (surtido), abre el panel de tallas.
     const exacta = catalog.find(c=>c.referencia.toUpperCase()===ref.toUpperCase() && c.lista===selectedLista);
     if(!exacta){
-      const surtidoRows = selectedLista ? buscarFilasSurtido(ref) : [];
-      if(surtidoRows.length){
-        document.getElementById('man-ref').value='';
-        openSurtidoPanel(ref, surtidoRows);
-        return;
-      }
+      if(abrirSurtidoManual(ref)) return;
       if(!selectedLista && catalog.some(c=>c.articulo===ref || c.referencia.toUpperCase()===ref.toUpperCase())){
         notify('Primero selecciona la lista de precios.'); return;
       }
